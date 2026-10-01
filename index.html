@@ -292,7 +292,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         updateTriggers: { getColor: [state.zoom > -4.6] }, fontFamily: '"Zen Kaku Gothic New", sans-serif', characterSet: 'auto', modelMatrix: mm, billboard: true,
       }),
       new deck.SolidPolygonLayer({
-        id: 'bldg', data: state.bldg && state.mode !== 'under' ? bldgs : [], getPolygon: (d) => d.rings, extruded: true,
+        // データを空にして消すと底面が残るので、データはそのままで visible で切り替える
+        id: 'bldg', data: bldgs, visible: state.bldg && state.mode !== 'under', getPolygon: (d) => d.rings, extruded: true,
         getElevation: (d) => d.h, getFillColor: bldgColor, modelMatrix: mm, pickable: true,
         autoHighlight: true, highlightColor: [255, 255, 255, 90],
         material: { ambient: 0.55, diffuse: 0.5, shininess: 8, specularColor: [40, 40, 40] },
@@ -435,6 +436,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   document.getElementById('showNames').addEventListener('change', (e) => { state.names = e.target.checked; redraw(); });
   document.getElementById('showBldg').addEventListener('change', (e) => {
     state.bldg = e.target.checked;
+    tip.hidden = true;
     // ×45 のままだと 200m のビルが 9km の塔になるので、重ねるときは倍率を下げる
     const lower = state.bldg && state.exag > 10;
     if (lower) { state.exag = 2; exag.value = 2; document.getElementById('exagVal').textContent = '×2'; }

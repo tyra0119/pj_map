@@ -200,14 +200,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <div class="group">
     <label class="label" for="exag">深さの強調</label>
     <div class="row">
-      <input type="range" id="exag" min="1" max="120" step="1" value="45">
+      <input type="range" autocomplete="off" id="exag" min="1" max="120" step="1" value="45">
       <span class="num" id="exagVal">×45</span>
     </div>
   </div>
 
-  <label class="check"><input type="checkbox" id="showNames" checked> 駅名を表示</label>
+  <label class="check"><input type="checkbox" autocomplete="off" id="showNames" checked> 駅名を表示</label>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showMap" checked> 地図を表示</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showMap" checked> 地図を表示</label>
     <div class="seg seg4" role="group" aria-label="地図の種類" id="mapStyle">
       <button data-style="std" aria-pressed="true">標準</button>
       <button data-style="pale" aria-pressed="false">淡色</button>
@@ -216,19 +216,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showTrains"> 走っている列車</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showTrains"> 走っている列車</label>
     <p class="hint" id="trainStatus" hidden></p>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showInfo"> 運行情報（遅れ・見合わせ）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showInfo"> 運行情報（遅れ・見合わせ）</label>
     <div class="info" id="infoBox" hidden></div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showUbld"> 地下街（新宿・渋谷・池袋・八重洲・札幌）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showUbld"> 地下街（新宿・渋谷・池袋・八重洲・札幌）</label>
     <p class="hint" id="ubldNote" hidden>PLATEAU の地下街モデルの床を、地下鉄と同じ倍率で重ねています。</p>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showPw"> 駅の中（大江戸線 12 駅の通路・階段・エレベーター）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showPw"> 駅の中（大江戸線 12 駅の通路・階段・エレベーター）</label>
     <div class="flood" id="pwBox" hidden>
       <p class="hint">出入口からホームまでの道のり。いちばん短い道（階段・エスカレーターも使う）と、エレベーターだけで行ける道。階はデータの「地下何階」で、いちばん下（ホーム）をその駅の線路の深さに合わせて描いています。</p>
       <div class="legend" id="pwLegend"></div>
@@ -236,7 +236,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showPax"> 駅の利用者数（柱）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showPax"> 駅の利用者数（柱）</label>
     <div class="flood" id="paxBox" hidden>
       <p class="hint">1 日の乗降人員（各社の最新年度の合計。乗車人員だけの会社は 2 倍した目安）。柱の高さ 1km が 200 万人です。</p>
       <span class="label">利用者の多い駅</span>
@@ -244,7 +244,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showFlood"> 浸水想定（洪水）を重ねる</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showFlood"> 浸水想定（洪水）を重ねる</label>
     <div class="flood" id="floodBox" hidden>
       <p class="hint">川があふれたときの想定最大の浸水の深さ。駅の上の円柱が水の高さで、地下の深さと同じ倍率です。</p>
       <div class="legend" id="floodLegend"></div>
@@ -253,7 +253,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showBldg"> ビルを重ねる（主な都市・高さ 31m 以上）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showBldg"> ビルを重ねる（主な都市・高さ 31m 以上）</label>
     <p class="hint" id="bldgLoading" hidden>ビルのデータを読み込んでいます…</p>
     <p class="hint" id="bldgHint" hidden>ビルの高さも地下の深さと同じ倍率で引き伸ばしています。倍率を ×2 に下げました（地下鉄の深さもそのぶん浅く見えます）。</p>
   </div>
@@ -289,7 +289,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupmvnhj').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muq2gvgz').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -319,7 +319,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmvnhj').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq2gvgz').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -327,7 +327,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupmvnhj').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muq2gvgz').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -806,12 +806,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=mupmvnhj').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq2gvgz').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=mupmvnhj`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muq2gvgz`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -830,7 +830,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=mupmvnhj').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muq2gvgz').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1235,7 +1235,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmvnhj').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq2gvgz').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1313,7 +1313,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmvnhj').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq2gvgz').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1371,7 +1371,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const { file } = serviceDay();
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=mupmvnhj`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muq2gvgz`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1502,6 +1502,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(v)); } catch (e) { /* 覚えられないときはそのまま */ }
   }
   function restoreSettings() {
+    // まず、チェックと倍率の見た目を中身（state）にそろえる（ブラウザのフォームの復元で食い違うことがある）
+    for (const [k, id] of Object.entries(CHECKS)) { const el = document.getElementById(id); if (el) el.checked = !!state[k]; }
+    exag.value = state.exag;
     let v = null;
     try { v = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { v = null; }
     if (!v) return;
@@ -1514,9 +1517,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         if (k && state.kinds.has(k.key) !== v.kinds.includes(k.key)) b.click();
       }
       if (v.mapStyle && v.mapStyle !== state.mapStyle) document.querySelector(`#mapStyle button[data-style="${v.mapStyle}"]`)?.click();
+      // チェックの見た目ではなく中身（state）と比べる。ブラウザがチェックだけを前の状態に戻していることがあるため
       for (const [k, id] of Object.entries(CHECKS)) {
         const el = document.getElementById(id);
-        if (el && typeof v[k] === 'boolean' && el.checked !== v[k]) { el.checked = v[k]; el.dispatchEvent(new Event('change')); }
+        if (!el || typeof v[k] !== 'boolean') continue;
+        el.checked = v[k];
+        if (!!state[k] !== v[k]) el.dispatchEvent(new Event('change'));
       }
       if (typeof v.exag === 'number' && v.exag !== state.exag) {
         state.exag = v.exag; exag.value = v.exag; document.getElementById('exagVal').textContent = '×' + v.exag; document.getElementById('bldgHint').hidden = true; redraw();

@@ -87,6 +87,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 .note { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; border-top: 1px solid var(--line); padding-top: 10px; }
 .note a { color: var(--muted); }
 
+.mapctl {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; display: grid; gap: 6px; z-index: 4;
+}
+.mapctl button {
+  width: 40px; height: 40px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(6px);
+  font: 400 22px/1 var(--font-body);
+}
+.mapctl button:hover { background-color: rgba(242, 181, 68, 0.16); }
+.mapctl button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.mapctl button[aria-busy="true"] { opacity: 0.6; cursor: progress; }
+.mapctl .gap { height: 4px; }
+.mapctl svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.toast {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 6; max-width: calc(100% - 140px);
+  background: rgba(10, 15, 21, 0.94); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--fg);
+}
+.toast[hidden] { display: none; }
 .tip {
   position: absolute; pointer-events: none; background: rgba(10, 15, 21, 0.94); border: 1px solid var(--line); border-radius: 7px;
   padding: 7px 10px; font-size: 12.5px; line-height: 1.5; color: var(--fg); width: max-content; max-width: 240px; transform: translate(12px, 12px); z-index: 5;
@@ -170,6 +188,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
 </aside>
 <div class="tip" id="tip" hidden></div>
+<div class="mapctl" role="group" aria-label="地図の操作">
+  <button id="zoomIn" aria-label="拡大" title="拡大">＋</button>
+  <button id="zoomOut" aria-label="縮小" title="縮小">－</button>
+  <span class="gap" aria-hidden="true"></span>
+  <button id="locate" aria-label="現在地へ移動" title="現在地">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12H6M18 12h3.5"/></svg>
+  </button>
+  <button id="fitAll" aria-label="日本全体を表示" title="全体">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+  </button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
 <script>
@@ -236,7 +266,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { key: 'private', label: '私鉄など', color: '#DA0442' },
     { key: 'other', label: '路面電車・モノレール・新交通', color: '#EE86A7' },
   ];
-  const state = { mode: 'all', exag: 45, names: true, map: true, found: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
+  const state = { mode: 'all', exag: 45, names: true, map: true, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // 皇居の少し東（東京駅付近）を中心に
@@ -462,6 +492,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         widthUnits: 'pixels', getWidth: 3, widthMinPixels: 2, billboard: true, capRounded: true, jointRounded: true,
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
+      // 現在地
+      new deck.ScatterplotLayer({
+        id: 'me', data: state.me ? [state.me] : [], getPosition: (d) => [d.x, d.y, 0], getRadius: 7, radiusUnits: 'pixels',
+        stroked: true, getFillColor: [66, 165, 245, 255], getLineColor: [255, 255, 255, 255], lineWidthUnits: 'pixels', getLineWidth: 2, billboard: true, modelMatrix: mm,
+      }),
       new deck.ScatterplotLayer({
         id: 'found', data: state.found ? [state.found] : [], getPosition: (d) => [d.x, d.y, Math.max(0, d.zmax)], getRadius: 10, radiusUnits: 'pixels',
         stroked: true, filled: false, getLineColor: [242, 181, 68, 255], lineWidthUnits: 'pixels', getLineWidth: 2.5, billboard: true, modelMatrix: mm,
@@ -640,6 +675,41 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     qList.hidden = false; q.setAttribute('aria-expanded', 'true');
     if (sel >= 0) q.setAttribute('aria-activedescendant', 'qopt' + sel); else q.removeAttribute('aria-activedescendant');
   }
+  // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----
+  function fly(v, ms) {
+    const nv = { ...current, ...v };
+    deckgl.setProps({ initialViewState: { ...nv, ...LIMITS, transitionDuration: reduceMotion ? 0 : ms, transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationX', 'rotationOrbit']) } });
+    state.zoom = nv.zoom; redraw();
+  }
+  const toastEl = document.getElementById('toast');
+  let toastTimer = 0;
+  function toast(text) { toastEl.textContent = text; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, 4000); }
+  document.getElementById('zoomIn').addEventListener('click', () => fly({ zoom: Math.min(LIMITS.maxZoom, current.zoom + 1) }, 300));
+  document.getElementById('zoomOut').addEventListener('click', () => fly({ zoom: Math.max(LIMITS.minZoom, current.zoom - 1) }, 300));
+  // 全体: 真上から、データ全体（日本全国）が入る拡大率に。パソコンでは左の操作盤のぶんをよける
+  document.getElementById('fitAll').addEventListener('click', () => {
+    const el = document.getElementById('map'), W = el.clientWidth, H = el.clientHeight;
+    const pad = window.matchMedia('(max-width: 640px)').matches || panel.classList.contains('collapsed') ? 0 : panel.offsetWidth + 24;
+    const scale = Math.min((W - pad - 70) / (maxX - minX), (H - 100) / (maxY - minY));
+    fly({ target: [(minX + maxX) / 2 - (pad - 70) / 2 / scale, (minY + maxY) / 2, 0], zoom: Math.log2(scale), rotationOrbit: 0, rotationX: 90 }, 900);
+  });
+  // 現在地: 端末の位置情報で移動して青い点で示す
+  const locBtn = document.getElementById('locate');
+  locBtn.addEventListener('click', () => {
+    if (!navigator.geolocation) { toast('この端末では現在地を使えません'); return; }
+    locBtn.setAttribute('aria-busy', 'true');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      locBtn.removeAttribute('aria-busy');
+      const [x, y] = fromLonLat(pos.coords.longitude, pos.coords.latitude);
+      state.me = { x, y };
+      if (x < minX - 20000 || x > maxX + 20000 || y < minY - 20000 || y > maxY + 20000) { toast('現在地が地図の範囲（日本）の外です'); redraw(); return; }
+      fly({ target: [x, y, 0], zoom: Math.max(current.zoom, -1.6) }, 1000);
+    }, (err) => {
+      locBtn.removeAttribute('aria-busy');
+      toast(err.code === 1 ? '現在地の利用が許可されていません（ブラウザの設定で許可してください）' : '現在地を取得できませんでした');
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  });
+
   function goStation(s) {
     state.found = s;
     q.value = s.name; qList.hidden = true; q.setAttribute('aria-expanded', 'false');

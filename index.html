@@ -53,6 +53,16 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 12.5px; min-width: 3.2em; text-align: right; }
 .check { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .check input { accent-color: var(--lamp); }
+.spots { display: flex; flex-wrap: wrap; gap: 6px; }
+.spots button { font: inherit; font-size: 12.5px; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.spots button:hover { background-color: rgba(242, 181, 68, 0.12); }
+.picked .row { gap: 14px; }
+.stopfly {
+  position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6;
+  font: inherit; font-size: 14px; font-weight: 700; color: #1A1204; background: var(--lamp); border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer;
+}
+.stopfly[hidden] { display: none; }
+@media (max-width: 640px) { .stopfly { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); } }
 .flood { display: grid; gap: 8px; }
 .flood[hidden] { display: none; }
 .legend { display: grid; grid-template-columns: repeat(3, auto); gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
@@ -141,6 +151,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   </div>
   <p class="lede">全国の鉄道を立体で見られます（最初は東京駅のあたり）。半透明の板が地面です。板の下が地下を走る区間、上が高架です。ドラッグで移動、右ドラッグか Shift＋ドラッグで回転・傾け、ホイールで拡大します（スマホは 1 本指で移動、2 本指で拡大・回転）。線に触れると路線名が出ます。</p>
 
+  <div class="group">
+    <span class="label">見どころ</span>
+    <div class="spots" id="spots"></div>
+    <p class="hint" id="spotNote" hidden></p>
+  </div>
+
   <div class="group search">
     <label class="label" for="q">駅を探す</label>
     <input id="q" type="search" placeholder="駅名（例: 新宿、おおみや）" autocomplete="off" spellcheck="false"
@@ -204,7 +220,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <div class="picked" id="picked" hidden>
     <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span></div>
     <p id="pickedInfo"></p>
-    <button id="clearPick">選択を外す</button>
+    <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
   </div>
 
   <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>列車の位置: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a>（都営・JR東日本）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
@@ -222,6 +238,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   </button>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<button class="stopfly" id="stopFly" hidden>■ 飛ぶのをやめる</button>
 
 <script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
 <script>
@@ -641,7 +658,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       onHover, onClick,
       getCursor: ({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab'),
       onViewStateChange: ({ viewState: vs0 }) => {
-        const viewState = onGround(vs0);
+        const viewState = flying ? vs0 : onGround(vs0);
         current = viewState;
         saveHash(viewState);
         const nz = viewState.zoom;
@@ -652,7 +669,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       },
     });
     document.getElementById('loading').remove();
-    window.rail3d = { deck: deckgl, state };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines };  // 確認用
   }
 
   // 右ドラッグで回転するので、地図の上ではブラウザの右クリックメニューを出さない
@@ -742,6 +759,126 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     qList.hidden = false; q.setAttribute('aria-expanded', 'true');
     if (sel >= 0) q.setAttribute('aria-activedescendant', 'qopt' + sel); else q.removeAttribute('aria-activedescendant');
   }
+  // ---- 見どころと、路線をなぞって飛ぶ ----
+  // 見どころ: 場所・角度に加えて、ビルや浸水想定などの表示もいっしょに切り替える
+  const SPOTS = [
+    { name: '東京駅の地下', at: [139.7671, 35.6812], zoom: -1.2, orbit: -40, tilt: -18, note: '地下から見上げた東京駅。総武快速線・京葉線のホームは深く、丸ノ内線は浅いところを通ります。' },
+    { name: '都庁と都庁前駅', at: [139.6917, 35.6896], zoom: -1.0, orbit: -30, tilt: 16, bldg: true, note: '高さ 243m の都庁と、地下 30m 台の大江戸線を同じ倍率（×2）で。ビルの高さに比べると地下鉄は意外と浅く見えます。' },
+    { name: '新宿の地下', at: [139.7005, 35.6905], zoom: -0.6, orbit: 20, tilt: -25, note: 'JR・私鉄・地下鉄が集まる新宿。地下にいくつもの路線が重なっています。' },
+    { name: '大阪・梅田', at: [135.4985, 34.7020], zoom: -1.2, orbit: -20, tilt: 24, bldg: true, note: '梅田のビル群と、その下を通る御堂筋線・四つ橋線・谷町線。' },
+    { name: '北千住と浸水想定', at: [139.8045, 35.7495], zoom: -1.6, orbit: -25, tilt: 22, flood: true, note: '荒川と隅田川にはさまれた北千住。想定最大の洪水では 5〜10m 浸かる区域に、地下 20m 前後のホームがあります。' },
+    { name: '名古屋', at: [136.8840, 35.1700], zoom: -2.2, orbit: -15, tilt: 26, bldg: true, note: '名古屋駅から栄へ。東山線・名城線などの地下鉄とビル。' },
+    { name: '日本全体', fit: true, note: '全国の鉄道。縮小すると都道府県名が出ます。' },
+  ];
+  const spotNote = document.getElementById('spotNote');
+  function goSpot(sp) {
+    stopFly();
+    spotNote.textContent = sp.note; spotNote.hidden = false;
+    const b = document.getElementById('showBldg'), f = document.getElementById('showFlood');
+    if (!!sp.bldg !== state.bldg) b.click();
+    if (!!sp.flood !== state.flood) f.click();
+    // ビルを出さない見どころでは、地下が見やすい倍率に戻す
+    if (!sp.bldg && state.exag < 10) { state.exag = 45; exag.value = 45; document.getElementById('exagVal').textContent = '×45'; redraw(); }
+    if (sp.fit) { document.getElementById('fitAll').click(); return; }
+    fly({ target: fromLonLat(...sp.at), zoom: sp.zoom, rotationOrbit: sp.orbit, rotationX: sp.tilt }, 1400);
+  }
+  for (const sp of SPOTS) {
+    const btn = document.createElement('button');
+    btn.textContent = sp.name;
+    btn.addEventListener('click', () => goSpot(sp));
+    document.getElementById('spots').appendChild(btn);
+  }
+
+  // 路線をなぞって飛ぶ: その路線の区間を端でつないだ道すじのうち、いちばん遠い 2 点のあいだをたどる
+  let flying = false, flyRaf = 0;
+  function linePath(li) {
+    const ss = segs.filter((s) => s.li === li);
+    const key = (p) => Math.round(p[0] / 5) + ',' + Math.round(p[1] / 5);
+    const adj = new Map();
+    const add = (k, e) => { if (!adj.has(k)) adj.set(k, []); adj.get(k).push(e); };
+    for (const s of ss) {
+      let len = 0;
+      for (let i = 1; i < s.path.length; i++) len += Math.hypot(s.path[i][0] - s.path[i - 1][0], s.path[i][1] - s.path[i - 1][1]);
+      const a = key(s.path[0]), b = key(s.path[s.path.length - 1]);
+      // fwd: この向きにたどると区間の点列がそのままの順
+      add(a, { to: b, s, len, fwd: true }); add(b, { to: a, s, len, fwd: false });
+    }
+    if (!adj.size) return null;
+    const far = (start) => {
+      const dist = new Map([[start, 0]]), prev = new Map(), todo = [start];
+      while (todo.length) {
+        todo.sort((p, q) => dist.get(q) - dist.get(p));
+        const u = todo.pop();
+        for (const e of adj.get(u) || []) {
+          const nd = dist.get(u) + e.len;
+          if (!dist.has(e.to) || nd < dist.get(e.to)) { dist.set(e.to, nd); prev.set(e.to, e); todo.push(e.to); }
+        }
+      }
+      let best = start;
+      for (const [k, d] of dist) if (d > dist.get(best)) best = k;
+      return { best, prev, dist };
+    };
+    const A = far(adj.keys().next().value).best, { best: B, prev } = far(A);
+    // B から A へ戻りながら、通った区間を集める（集めたあとで逆順にすると A → B）
+    const route = [];
+    for (let k = B; k !== A;) {
+      const e = prev.get(k);
+      route.push(e);
+      k = [...adj.entries()].find(([kk, es]) => es.includes(e))[0];
+    }
+    route.reverse();
+    const pts = [];
+    for (const e of route) {
+      const p = e.fwd ? e.s.path : e.s.path.slice().reverse();
+      for (const q of pts.length ? p.slice(1) : p) pts.push(q);
+    }
+    return pts.length > 1 ? pts : null;
+  }
+  function stopFly() {
+    if (!flying) return;
+    flying = false; cancelAnimationFrame(flyRaf);
+    document.getElementById('stopFly').hidden = true;
+    fly({ target: [current.target[0], current.target[1], 0], rotationX: Math.max(current.rotationX, 20) }, 600);
+  }
+  function flyLine(li) {
+    const pts = linePath(li);
+    if (!pts) return;
+    // 50m おきに打ち直す
+    const P = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0, z0] = pts[i - 1], [x1, y1, z1] = pts[i], d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(d / 50));
+      for (let k = 1; k <= n; k++) P.push([x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, z0 + (z1 - z0) * k / n]);
+    }
+    const total = (P.length - 1) * 50, speed = Math.max(300, total / 90); // m/秒。長い路線は 90 秒ほどで
+    flying = true;
+    document.getElementById('stopFly').hidden = false;
+    if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
+    let t0 = null, heading = null;
+    const angle = (i) => {
+      const a = P[Math.max(0, Math.min(P.length - 1, i))], b = P[Math.max(0, Math.min(P.length - 1, i + 8))];
+      return Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI;
+    };
+    const step = (ts) => {
+      if (!flying) return;
+      if (t0 === null) t0 = ts;
+      const sdist = (ts - t0) / 1000 * speed, i = Math.floor(sdist / 50);
+      if (i >= P.length - 1) { stopFly(); return; }
+      const f = sdist / 50 - i, a = P[i], b = P[i + 1];
+      const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, z = (a[2] + (b[2] - a[2]) * f) * state.exag;
+      // 向きはなめらかに追いかける（一周の境目に気をつける）
+      const want = angle(i);
+      if (heading === null) heading = want;
+      heading += ((((want - heading) % 360) + 540) % 360 - 180) * 0.06;
+      const vs = { ...current, target: [x, y, z], rotationOrbit: heading, rotationX: 14, zoom: 0.2 };
+      current = vs;
+      deckgl.setProps({ initialViewState: { ...vs, ...LIMITS, transitionDuration: 0 } });
+      flyRaf = requestAnimationFrame(step);
+    };
+    flyRaf = requestAnimationFrame(step);
+  }
+  document.getElementById('stopFly').addEventListener('click', stopFly);
+  document.getElementById('map').addEventListener('pointerdown', stopFly);
+
   // ---- 走っている列車 ----
   // ODPT の列車は「前の駅と次の駅」しか分からないので、2 駅の中間に近い、対応する路線の線路の上に置く（停車中は駅に）
   // 中継サーバ（tyra.jp/odpt/api）経由。都営は main、JR 東日本は challenge。30 秒ごとに読み直す
@@ -882,6 +1019,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     redraw();
   });
   document.getElementById('clearPick').addEventListener('click', () => pick(null));
+  document.getElementById('flyLine').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked); });
   const panel = document.getElementById('panel'), tp = document.getElementById('togglePanel');
   tp.addEventListener('click', () => {
     const c = panel.classList.toggle('collapsed');

@@ -415,6 +415,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         id: 'tile-' + t.id, image: t.url, bounds: t.bounds.map(([x, y]) => [x, y, -1.4]), modelMatrix: mm,
         opacity: state.mode === 'under' ? 0.35 : 0.7, parameters: { depthWriteEnabled: false },
       })),
+      // 地面の板と地図に隠れて地下の線が途切れて見えないよう、地下の線を薄くもう一度重ねる
+      new deck.PathLayer({
+        id: 'under-through', data: under, getPath: (d) => d.path, getColor: (d) => { const c = segColor(d); return [c[0], c[1], c[2], Math.round(c[3] * 0.55)]; },
+        updateTriggers: { getColor: pickedTrig }, widthUnits: 'pixels', getWidth: 2.5, widthMinPixels: 1.5, billboard: true, capRounded: true, jointRounded: true,
+        modelMatrix: mm, parameters: { depthWriteEnabled: false },
+      }),
       new deck.PathLayer({
         id: 'bounds', data: bounds, getPath: (d) => d.path, getColor: (d) => (d.pref ? [150, 166, 188, 140] : [110, 126, 146, 70]),
         getWidth: (d) => (d.pref ? 1.4 : 0.8), widthUnits: 'pixels', billboard: true, modelMatrix: mm,

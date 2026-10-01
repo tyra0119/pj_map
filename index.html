@@ -215,6 +215,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <div class="info" id="infoBox" hidden></div>
   </div>
   <div class="group">
+    <label class="check"><input type="checkbox" id="showPax"> 駅の利用者数（柱）</label>
+    <div class="flood" id="paxBox" hidden>
+      <p class="hint">1 日の乗降人員（各社の最新年度の合計。乗車人員だけの会社は 2 倍した目安）。柱の高さ 1km が 200 万人です。</p>
+      <span class="label">利用者の多い駅</span>
+      <ol class="rank" id="paxRank"></ol>
+    </div>
+  </div>
+  <div class="group">
     <label class="check"><input type="checkbox" id="showFlood"> 浸水想定（洪水）を重ねる</label>
     <div class="flood" id="floodBox" hidden>
       <p class="hint">川があふれたときの想定最大の浸水の深さ。駅の上の円柱が水の高さで、地下の深さと同じ倍率です。</p>
@@ -260,7 +268,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muplzoyo').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=mupm4lp0').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -278,7 +286,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const dec2 = (enc) => { const p = []; let x = 0, y = 0; for (let k = 0; k < enc.length; k += 2) { x += enc[k]; y += enc[k + 1]; p.push([x, y, 0]); } return p; };
   const coast = D.coast.map(dec2), rivers = D.rivers.map(dec2);
   const bounds = D.bounds.map(([pref, enc]) => ({ pref, path: dec2(enc) }));
-  const stations = D.stations.map(([name, x, y, zmin, zmax, ls, hira, flood]) => ({ name, x, y, zmin, zmax, lines: ls, hira: hira || '', flood: flood || 0 }));
+  const stations = D.stations.map(([name, x, y, zmin, zmax, ls, hira, flood, pax]) => ({ name, x, y, zmin, zmax, lines: ls, hira: hira || '', flood: flood || 0, pax: pax || 0 }));
   // 区市町村名（東京都だけ、拡大したとき）と都道府県名（縮小したとき）
   const wards = D.labels.filter((l) => !l[3]).map(([name, x, y]) => ({ name, x, y }));
   const prefLabels = D.labels.filter((l) => l[3]).map(([name, x, y]) => ({ name, x, y }));
@@ -290,7 +298,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muplzoyo').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupm4lp0').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -298,7 +306,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muplzoyo').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=mupm4lp0').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -320,7 +328,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { key: 'private', label: '私鉄など', color: '#DA0442' },
     { key: 'other', label: '路面電車・モノレール・新交通', color: '#EE86A7' },
   ];
-  const state = { mode: 'all', exag: 45, names: true, map: true, flood: false, trains: false, info: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
+  const state = { mode: 'all', exag: 45, names: true, map: true, flood: false, trains: false, info: false, pax: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // 皇居の少し東（東京駅付近）を中心に
@@ -565,6 +573,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
       ...trainsLayers(),
+      // 駅の利用者数を柱で（深さの倍率はかけない。高さ 1m = 2,000 人）
+      new deck.ColumnLayer({
+        id: 'pax-cols', data: state.pax ? st.filter((s) => s.pax) : [], getPosition: (d) => [d.x, d.y, Math.max(0, d.zmax) * state.exag], diskResolution: 12, radius: 70,
+        extruded: true, getElevation: (d) => d.pax / 2000, getFillColor: (d) => { const t = Math.min(1, Math.log10(d.pax / 1000) / 3.6); return [Math.round(120 + 135 * t), Math.round(150 + 50 * t), Math.round(220 - 170 * t), 210]; },
+        updateTriggers: { getPosition: [state.exag] }, pickable: true, material: { ambient: 0.6, diffuse: 0.5 },
+      }),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
         id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
@@ -612,7 +626,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     } else if (info.layer.id === 'bldg') {
       html = `<b>ビル</b> 高さ 約 ${o.h}m<br><span class="sub">地下鉄でいちばん深い大江戸線（約 32m）の ${(o.h / 32).toFixed(1)} 倍</span>`;
     } else {
-      html = `<b>${o.name}駅</b><br><span class="sub">${o.lines.map((li) => lines[li].name).join('、')}${o.zmin < 0 ? `<br>いちばん深いホーム 約 ${Math.round(-o.zmin)}m（目安）` : ''}${o.flood ? `<br>洪水の浸水想定 ${FLOOD[o.flood][0]}（想定最大規模）` : ''}</span>`;
+      html = `<b>${o.name}駅</b><br><span class="sub">${o.lines.map((li) => lines[li].name).join('、')}${o.zmin < 0 ? `<br>いちばん深いホーム 約 ${Math.round(-o.zmin)}m（目安）` : ''}${o.flood ? `<br>洪水の浸水想定 ${FLOOD[o.flood][0]}（想定最大規模）` : ''}${o.pax ? `<br>1 日の乗降 約 ${o.pax >= 10000 ? (o.pax / 10000).toFixed(1) + ' 万' : o.pax.toLocaleString()} 人（目安）` : ''}</span>`;
     }
     tip.innerHTML = html; tip.hidden = false;
     tip.style.left = info.x + 'px'; tip.style.top = info.y + 'px';
@@ -741,6 +755,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
   }
   document.getElementById('showTrains').addEventListener('change', (e) => setTrains(e.target.checked));
+  // 利用者の多い駅の一覧
+  {
+    const ol = document.getElementById('paxRank');
+    for (const s of stations.filter((s) => s.pax).sort((a, b) => b.pax - a.pax).slice(0, 30)) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span></span> <span class="sub"></span>';
+      li.children[0].textContent = s.name;
+      li.children[1].textContent = `約 ${(s.pax / 10000).toFixed(0)} 万人`;
+      li.addEventListener('click', () => goStation(s));
+      ol.appendChild(li);
+    }
+  }
+  document.getElementById('showPax').addEventListener('change', (e) => {
+    state.pax = e.target.checked;
+    document.getElementById('paxBox').hidden = !state.pax;
+    redraw();
+  });
   document.getElementById('showFlood').addEventListener('change', (e) => {
     state.flood = e.target.checked;
     document.getElementById('floodBox').hidden = !state.flood;
@@ -1096,7 +1127,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muplzoyo').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupm4lp0').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const seen = new Set();
@@ -1170,7 +1201,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muplzoyo').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupm4lp0').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];

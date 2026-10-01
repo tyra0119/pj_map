@@ -224,6 +224,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <div class="info" id="infoBox" hidden></div>
   </div>
   <div class="group">
+    <label class="check"><input type="checkbox" id="showUbld"> 地下街（新宿・渋谷・池袋・八重洲・札幌）</label>
+    <p class="hint" id="ubldNote" hidden>PLATEAU の地下街モデルの床を、地下鉄と同じ倍率で重ねています。</p>
+  </div>
+  <div class="group">
     <label class="check"><input type="checkbox" id="showPw"> 駅の中（大江戸線 12 駅の通路・階段・エレベーター）</label>
     <div class="flood" id="pwBox" hidden>
       <p class="hint">出入口からホームまでの道のり。いちばん短い道（階段・エスカレーターも使う）と、エレベーターだけで行ける道。階はデータの「地下何階」で、いちばん下（ホーム）をその駅の線路の深さに合わせて描いています。</p>
@@ -260,7 +264,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
   </div>
 
-  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（標準地図・淡色地図・写真。「暗い」は淡色地図を加工）<br>列車の位置・運行情報: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a><br>駅の中: 東京都交通局「都営地下鉄 GTFS-Pathways」（<a href="https://ckan.odpt.org/dataset/train-toei" target="_blank" rel="noopener">公共交通オープンデータセンター</a>、CC BY 4.0）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（標準地図・淡色地図・写真。「暗い」は淡色地図を加工）<br>列車の位置・運行情報: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a><br>地下街: 「3D都市モデル（Project PLATEAU）」地下街モデル（国土交通省、CC BY 4.0）を加工。地面の高さは国土地理院の標高・ジオイド高<br>駅の中: 東京都交通局「都営地下鉄 GTFS-Pathways」（<a href="https://ckan.odpt.org/dataset/train-toei" target="_blank" rel="noopener">公共交通オープンデータセンター</a>、CC BY 4.0）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
 </aside>
 <div class="tip" id="tip" hidden></div>
 <div class="mapctl" role="group" aria-label="地図の操作">
@@ -285,7 +289,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupmmctr').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=mupmu6xb').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -315,7 +319,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmmctr').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmu6xb').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -323,7 +327,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupmmctr').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=mupmu6xb').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -345,7 +349,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { key: 'private', label: '私鉄など', color: '#DA0442' },
     { key: 'other', label: '路面電車・モノレール・新交通', color: '#EE86A7' },
   ];
-  const state = { mode: 'all', exag: 45, names: true, map: true, mapStyle: 'std', flood: false, trains: false, info: false, pax: false, pw: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
+  const state = { ubld: false, mode: 'all', exag: 45, names: true, map: true, mapStyle: 'std', flood: false, trains: false, info: false, pax: false, pw: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // 皇居の少し東（東京駅付近）を中心に
@@ -504,6 +508,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     refreshTimer = setTimeout(() => {
       refreshTimer = 0;
       if (state.bldg && bldgIndex) loadBldg(viewBox());
+      if (state.ubld && ubldIndex) loadUbld(viewBox());
       const zk = state.trains ? Math.round(current.zoom * 3) : 0;
       const before = labelKey + '#' + tileKey + '#' + lastZoomKey;
       const L = layers();
@@ -597,6 +602,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
       ...trainsLayers(),
+      // 地下街の床（区ごとに 1 つの形。位置は区の中心、深さの倍率は高さ方向の拡大で）
+      ...(state.ubld ? ubldMeshes : []).map((u) => new deck.SimpleMeshLayer({
+        id: 'ubld-' + u.f, data: [u], mesh: u.mesh, getPosition: (d) => [d.origin[0], d.origin[1], 0], getScale: [1, 1, state.exag],
+        getColor: [255, 168, 92, 170], updateTriggers: { getScale: [state.exag] }, material: { ambient: 0.8, diffuse: 0.3 }, parameters: { depthWriteEnabled: false },
+      })),
       // 駅の中の通路網（大江戸線 12 駅）。いちばん下の階をその駅のホームの深さに合わせる
       new deck.LineLayer({
         id: 'pw', data: state.pw ? pwEdges : [], getSourcePosition: (d) => [d[0], d[1], d[2]], getTargetPosition: (d) => [d[3], d[4], d[5]],
@@ -790,12 +800,36 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
   }
   document.getElementById('showTrains').addEventListener('change', (e) => setTrains(e.target.checked));
+  // ---- 地下街（PLATEAU） ----
+  // 見ている範囲にかかる区のファイルだけ読み込む。床の三角形なので、向き（法線）はすべて上
+  let ubldIndex = null, ubldMeshes = [];
+  const ubldLoaded = new Set();
+  async function loadUbld(box) {
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=mupmu6xb').then((r) => r.json()).catch(() => []);
+    const M = 3000;
+    for (const u of ubldIndex) {
+      if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
+      ubldLoaded.add(u.f);
+      fetch(`ubld/${u.f}?v=mupmu6xb`).then((r) => r.arrayBuffer()).then((buf) => {
+        const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
+        for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
+        ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
+        redraw();
+      }).catch(() => ubldLoaded.delete(u.f));
+    }
+  }
+  document.getElementById('showUbld').addEventListener('change', (e) => {
+    state.ubld = e.target.checked;
+    document.getElementById('ubldNote').hidden = !state.ubld;
+    if (state.ubld) loadUbld(viewBox()); else redraw();
+  });
+
   // ---- 駅の中（大江戸線 12 駅、都営の GTFS-Pathways） ----
   const PW_MODE = { 1: ['通路', [170, 182, 200, 230]], 2: ['階段', [242, 140, 40, 255]], 3: ['動く歩道', [170, 182, 200, 230]], 4: ['エスカレーター', [242, 200, 60, 255]], 5: ['エレベーター', [80, 205, 245, 255]], 6: ['改札', [255, 255, 255, 255]], 7: ['改札', [255, 255, 255, 255]] };
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=mupmmctr').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=mupmu6xb').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1200,7 +1234,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmmctr').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmu6xb').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1278,7 +1312,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmmctr').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmu6xb').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1336,7 +1370,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const { file } = serviceDay();
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=mupmmctr`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=mupmu6xb`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {

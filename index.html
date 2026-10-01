@@ -289,7 +289,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muq2gvgz').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muq3yuac').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -319,7 +319,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq2gvgz').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq3yuac').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -327,7 +327,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muq2gvgz').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muq3yuac').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -407,12 +407,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (!W || !current) return [];
     const vp = VIEW.makeViewport({ width: W, height: H, viewState: current });
     const ok = new Set(st), cells = new Map(), C = 48, out = [];
+    // 画面に入らない駅は位置の計算をしない（見えている地面の範囲を少し広げて判定）
+    const vb = viewBox(), pad = vb ? Math.max(vb[2] - vb[0], vb[3] - vb[1]) * 0.1 : 0;
+    const inView = (s) => !vb || (s.x > vb[0] - pad && s.x < vb[2] + pad && s.y > vb[1] - pad && s.y < vb[3] + pad);
     // 全国が見えるほど縮小したときは、乗り入れ路線の多い駅だけ（都道府県名が読めるように）
     const z = current.zoom, minLines = state.picked !== null ? 0 : z < -8.5 ? Infinity : z < -7 ? 4 : z < -5.5 ? 2 : 0;
     // 検索で選んだ駅はいつも先に出す
     const order = state.found ? [state.found, ...byPriority.filter((s) => s !== state.found)] : byPriority;
     for (const s of order) {
-      if (s !== state.found && (!ok.has(s) || s.lines.length < minLines)) continue;
+      if (s !== state.found && (!ok.has(s) || s.lines.length < minLines || !inView(s))) continue;
       const [x, y, z] = vp.project([s.x, s.y, Math.max(0, s.zmax) * state.exag]);
       if (!(z < 1) || x < -50 || x > W + 50 || y < -20 || y > H + 40) continue;
       const fs = s.lines.length >= 5 ? 14 : 12;
@@ -485,7 +488,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       return [Math.max(0, ix(x0)), Math.min(n - 1, ix(x1)), Math.max(0, iy(y1)), Math.min(n - 1, iy(y0)), w];
     };
     let r = range(z);
-    while (z > zmin && (r[1] - r[0] + 1) * (r[3] - r[2] + 1) > 70) r = range(--z);
+    while (z > zmin && (r[1] - r[0] + 1) * (r[3] - r[2] + 1) > 48) r = range(--z);
     const out = [];
     // 読み込み中のすき間を埋めるため、3 段粗いタイルを下に敷く
     for (const zz of z - 3 >= zmin ? [z - 3, z] : [z]) {
@@ -517,10 +520,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }, 120);
   }
 
+  // 条件が同じなら同じ配列を返す。配列が新しくなると、中身が同じでも deck.gl が描画用のデータ（線路は 40 万点）を
+  // 作り直すので、地図を動かすたび（0.12 秒ごと）に重くなっていた
+  const memo = new Map();
+  function cached(name, key, make) {
+    const m = memo.get(name);
+    if (m && m.key === key) return m.val;
+    const val = make();
+    memo.set(name, { key, val });
+    return val;
+  }
+
   function layers() {
     const mm = modelMatrix();
-    const under = segs.filter((s) => s.under && visibleSeg(s));
-    const above = segs.filter((s) => !s.under && visibleSeg(s));
+    const kindKey = state.mode + '|' + [...state.kinds].sort().join(',');
+    const stKey = kindKey + '|' + state.picked;
+    const under = cached('under', kindKey, () => segs.filter((s) => s.under && visibleSeg(s)));
+    const above = cached('above', kindKey, () => segs.filter((s) => !s.under && visibleSeg(s)));
     const pickedTrig = [state.picked];
     const showStation = (s) => {
       if (!s.lines.some((li) => state.kinds.has(lines[li].kind))) return false;
@@ -529,7 +545,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       if (state.picked !== null) return s.lines.includes(state.picked);
       return true;
     };
-    const st = stations.filter(showStation);
+    const st = cached('st', stKey, () => stations.filter(showStation));
+    const deepSt = cached('deep', stKey, () => st.filter((s) => s.zmin < 0));
     const baseTiles = state.map ? tilesFor(tileUrl, MAP_STYLES[state.mapStyle].zmin, 18) : [], floodTiles = state.flood ? tilesFor(floodUrl, 2, 17) : [];
     tileKey = baseTiles.map((t) => t.id).join(',') + '|' + floodTiles.map((t) => t.id).join(',');
     const groundAlpha = state.mode === 'under' ? 60 : 135;
@@ -541,11 +558,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }),
       // 駅の縦穴（地面から一番深いホームまで）
       new deck.LineLayer({
-        id: 'shafts', data: st.filter((s) => s.zmin < 0), getSourcePosition: (d) => [d.x, d.y, 0], getTargetPosition: (d) => [d.x, d.y, d.zmin],
+        id: 'shafts', data: deepSt, getSourcePosition: (d) => [d.x, d.y, 0], getTargetPosition: (d) => [d.x, d.y, d.zmin],
         getColor: [242, 181, 68, 150], getWidth: 1.2, widthUnits: 'pixels', modelMatrix: mm,
       }),
       new deck.ScatterplotLayer({
-        id: 'platforms', data: st.filter((s) => s.zmin < 0), getPosition: (d) => [d.x, d.y, d.zmin], getRadius: 2.5, radiusUnits: 'pixels',
+        id: 'platforms', data: deepSt, getPosition: (d) => [d.x, d.y, d.zmin], getRadius: 2.5, radiusUnits: 'pixels',
         getFillColor: [242, 181, 68, 230], billboard: true, modelMatrix: mm, pickable: true,
       }),
       new deck.SolidPolygonLayer({
@@ -592,7 +609,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }),
       // 運行情報のある路線を太い帯で（見合わせ・運休は赤、ほかは琥珀色）
       new deck.PathLayer({
-        id: 'info', data: state.info ? segs.filter((s) => infoByLi.has(s.li) && visibleSeg(s)) : [], getPath: (d) => d.path,
+        id: 'info', data: state.info ? cached('info', kindKey + '|' + infoStamp, () => segs.filter((s) => infoByLi.has(s.li) && visibleSeg(s))) : [], getPath: (d) => d.path,
         getColor: (d) => (infoByLi.get(d.li).stop ? [229, 72, 77, 150] : [242, 181, 68, 140]), updateTriggers: { getColor: [infoStamp] },
         widthUnits: 'pixels', getWidth: 11, billboard: true, capRounded: true, jointRounded: true, modelMatrix: mm, parameters: { depthWriteEnabled: false },
       }),
@@ -614,13 +631,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }),
       // 駅の利用者数を柱で（深さの倍率はかけない。高さ 1m = 2,000 人）
       new deck.ColumnLayer({
-        id: 'pax-cols', data: state.pax ? st.filter((s) => s.pax) : [], getPosition: (d) => [d.x, d.y, Math.max(0, d.zmax) * state.exag], diskResolution: 12, radius: 70,
+        id: 'pax-cols', data: state.pax ? cached('pax', stKey, () => st.filter((s) => s.pax)) : [], getPosition: (d) => [d.x, d.y, Math.max(0, d.zmax) * state.exag], diskResolution: 12, radius: 70,
         extruded: true, getElevation: (d) => d.pax / 2000, getFillColor: (d) => { const t = Math.min(1, Math.log10(d.pax / 1000) / 3.6); return [Math.round(120 + 135 * t), Math.round(150 + 50 * t), Math.round(220 - 170 * t), 210]; },
         updateTriggers: { getPosition: [state.exag] }, pickable: true, material: { ambient: 0.6, diffuse: 0.5 },
       }),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
-        id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
+        id: 'flood-cols', data: state.flood ? cached('flood', stKey, () => st.filter((s) => s.flood)) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
         extruded: true, getElevation: (d) => FLOOD[d.flood][1], getFillColor: (d) => [...FLOOD[d.flood][2], 200], modelMatrix: mm, pickable: true,
         material: { ambient: 0.6, diffuse: 0.5 },
       }),
@@ -722,6 +739,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     deckgl = new deck.DeckGL({
       container: 'map',
       views: VIEW,
+      // 高精細な画面（スマホは 3 倍など）でも 2 倍までで描く
+      useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
       initialViewState: { ...current, ...LIMITS },
       controller: { inertia: true, dragMode: 'pan', touchRotate: true },
       // 線は細いので、触れた位置から少し離れていても拾う（指で触るときは広めに）
@@ -745,7 +764,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     document.getElementById('loading').remove();
     setNeedle(current.rotationOrbit);
     restoreSettings();
-    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains, viewBox, labelsFor, stations, cur: () => current };  // 確認用
   }
 
   // 右ドラッグで回転するので、地図の上ではブラウザの右クリックメニューを出さない
@@ -806,12 +825,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq2gvgz').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq3yuac').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muq2gvgz`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muq3yuac`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -830,7 +849,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muq2gvgz').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muq3yuac').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1235,7 +1254,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq2gvgz').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq3yuac').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1301,7 +1320,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       loadTrains();
       trainTimer = setInterval(() => { if (!document.hidden) loadTrains(); }, 30000);
       lastTick = 0;
-      trainTick = setInterval(() => { if (!document.hidden && (trainMap.size || tt)) tickTrains(); else lastTick = 0; }, 66);
+      trainTick = setInterval(() => { if (!document.hidden && (trainMap.size || tt)) tickTrains(); else lastTick = 0; }, 100);
     } else { trainMap.clear(); trains = []; ttTrains = []; trainStatus.hidden = true; redraw(); }
   }
 
@@ -1313,7 +1332,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq2gvgz').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq3yuac').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1371,7 +1390,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const { file } = serviceDay();
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muq2gvgz`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muq3yuac`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {

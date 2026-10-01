@@ -183,6 +183,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <label class="check"><input type="checkbox" id="showNames" checked> 駅名を表示</label>
   <label class="check"><input type="checkbox" id="showMap" checked> 地図を表示</label>
   <div class="group">
+    <label class="check"><input type="checkbox" id="showTrains"> 走っている列車（都営・JR東日本）</label>
+    <p class="hint" id="trainStatus" hidden></p>
+  </div>
+  <div class="group">
     <label class="check"><input type="checkbox" id="showFlood"> 浸水想定（洪水）を重ねる</label>
     <div class="flood" id="floodBox" hidden>
       <p class="hint">川があふれたときの想定最大の浸水の深さ。駅の上の円柱が水の高さで、地下の深さと同じ倍率です。</p>
@@ -203,7 +207,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <button id="clearPick">選択を外す</button>
   </div>
 
-  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>列車の位置: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a>（都営・JR東日本）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
 </aside>
 <div class="tip" id="tip" hidden></div>
 <div class="mapctl" role="group" aria-label="地図の操作">
@@ -284,7 +288,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { key: 'private', label: '私鉄など', color: '#DA0442' },
     { key: 'other', label: '路面電車・モノレール・新交通', color: '#EE86A7' },
   ];
-  const state = { mode: 'all', exag: 45, names: true, map: true, flood: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
+  const state = { mode: 'all', exag: 45, names: true, map: true, flood: false, trains: false, found: null, me: null, bldg: false, kinds: new Set(KINDS.map((k) => k.key)), picked: null, zoom: -3.6 };
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // 皇居の少し東（東京駅付近）を中心に
@@ -520,6 +524,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         widthUnits: 'pixels', getWidth: 3, widthMinPixels: 2, billboard: true, capRounded: true, jointRounded: true,
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
+      // 走っている列車（ODPT）。読み直すたびに位置がなめらかに動く
+      new deck.ScatterplotLayer({
+        id: 'trains', data: state.trains ? trains : [], getPosition: (d) => [d.x, d.y, d.z], getRadius: 5.5, radiusUnits: 'pixels',
+        stroked: true, getFillColor: (d) => d.rgb, getLineColor: [255, 255, 255, 230], lineWidthUnits: 'pixels', getLineWidth: 1.5,
+        billboard: true, modelMatrix: mm, pickable: true, transitions: { getPosition: 1500 },
+      }),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
         id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
@@ -560,6 +570,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const l = lines[o.li];
       const where = o.under ? `地下 約 ${Math.round(-o.path[Math.floor(o.path.length / 2)][2])}m` : (o.cat === 'e' ? '高架' : '地上');
       html = `<b style="color:${l.color}">■</b> <b>${l.name}</b><br><span class="sub">${l.op || ''}${l.op ? '・' : ''}${where}</span>`;
+    } else if (info.layer.id === 'trains') {
+      const delay = o.delay >= 60 ? `<b style="color:#F2B544">${Math.round(o.delay / 60)} 分遅れ</b>` : '遅れなし';
+      html = `<b style="color:rgb(${o.rgb.slice(0, 3)})">■</b> <b>${o.rw} ${o.type}</b><br><span class="sub">${o.dest ? o.dest + '行き・' : ''}${o.no}<br>${o.at}・${delay}${o.z < -1 ? `<br>地下 約 ${Math.round(-o.z)}m を走行中` : ''}</span>`;
     } else if (info.layer.id === 'bldg') {
       html = `<b>ビル</b> 高さ 約 ${o.h}m<br><span class="sub">地下鉄でいちばん深い大江戸線（約 32m）の ${(o.h / 32).toFixed(1)} 倍</span>`;
     } else {
@@ -688,6 +701,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       ol.appendChild(li);
     }
   }
+  document.getElementById('showTrains').addEventListener('change', (e) => setTrains(e.target.checked));
   document.getElementById('showFlood').addEventListener('change', (e) => {
     state.flood = e.target.checked;
     document.getElementById('floodBox').hidden = !state.flood;
@@ -728,6 +742,76 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     qList.hidden = false; q.setAttribute('aria-expanded', 'true');
     if (sel >= 0) q.setAttribute('aria-activedescendant', 'qopt' + sel); else q.removeAttribute('aria-activedescendant');
   }
+  // ---- 走っている列車 ----
+  // ODPT の列車は「前の駅と次の駅」しか分からないので、2 駅の中間に近い、対応する路線の線路の上に置く（停車中は駅に）
+  // 中継サーバ（tyra.jp/odpt/api）経由。都営は main、JR 東日本は challenge。30 秒ごとに読み直す
+  const RELAY = 'https://tyra.jp/odpt/api';
+  const TRAIN_TYPE = { Local: '各駅停車', Rapid: '快速', CommuterRapid: '通勤快速', SpecialRapid: '特別快速', ChuoSpecialRapid: '中央特快', OmeSpecialRapid: '青梅特快', LimitedExpress: '特急', Express: '急行', AirportRapidLimitedExpress: 'エアポート快特', RapidLimitedExpress: '快特' };
+  let trains = [], odpt = null, trainTimer = 0, segGrid = null;
+  const SG = 1000;
+  function buildSegGrid() {
+    segGrid = new Map();
+    for (const s of segs) for (const [x, y, z] of s.path) {
+      const k = Math.floor(x / SG) + ',' + Math.floor(y / SG);
+      if (!segGrid.has(k)) segGrid.set(k, []);
+      segGrid.get(k).push([x, y, z, s.li]);
+    }
+  }
+  function snap(x, y, li) {
+    let best = null, bd = Infinity;
+    for (const want of li.length ? [new Set(li), null] : [null]) {
+      for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 1; gy++) {
+        for (const p of segGrid.get((Math.floor(x / SG) + gx) + ',' + (Math.floor(y / SG) + gy)) || []) {
+          if (want && !want.has(p[3])) continue;
+          const d = (p[0] - x) ** 2 + (p[1] - y) ** 2;
+          if (d < bd) { bd = d; best = p; }
+        }
+      }
+      if (best) break;
+    }
+    return best;
+  }
+  const trainStatus = document.getElementById('trainStatus');
+  async function loadTrains() {
+    try {
+      if (!odpt) { odpt = await fetch('odpt.json').then((r) => r.json()); buildSegGrid(); }
+      const lists = await Promise.all([['main', 'Toei'], ['challenge', 'JR-East']].map(([up, op]) =>
+        fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
+      const next = [];
+      for (const t of lists.flat()) {
+        const a = odpt.st[t['odpt:fromStation']], b = t['odpt:toStation'] ? odpt.st[t['odpt:toStation']] : null;
+        if (!a) continue;
+        const [rwTitle, li] = odpt.rw[t['odpt:railway']] || ['', []];
+        const mx = b ? (a[0] + b[0]) / 2 : a[0], my = b ? (a[1] + b[1]) / 2 : a[1];
+        const p = snap(mx, my, li);
+        const lineIdx = p ? p[3] : li[0];
+        const rgb = lineIdx !== undefined ? lines[lineIdx].rgb.slice(0, 3) : [220, 220, 220];
+        const destId = (t['odpt:destinationStation'] || [])[0];
+        next.push({
+          id: t['owl:sameAs'], x: p ? p[0] : mx, y: p ? p[1] : my, z: p ? p[2] : 0, rgb: [...rgb, 255],
+          rw: rwTitle, no: t['odpt:trainNumber'], type: TRAIN_TYPE[(t['odpt:trainType'] || '').split('.').pop()] || '',
+          dest: destId && odpt.st[destId] ? odpt.st[destId][2] : '', delay: t['odpt:delay'] || 0,
+          at: b ? `${a[2]}→${b[2]}` : `${a[2]}に停車中`,
+        });
+      }
+      // 同じ列車は同じ順番に並べて、位置がなめらかに動くようにする
+      next.sort((p, q) => (p.id < q.id ? -1 : 1));
+      trains = next;
+      const now = new Date();
+      trainStatus.textContent = next.length ? `${next.length} 本（${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）。位置は駅と駅の中間あたりの目安です。` : '走っている列車が取れませんでした（運転時間外か、中継サーバが止まっています）。';
+      trainStatus.hidden = false;
+      redraw();
+    } catch (e) {
+      trainStatus.textContent = '列車の位置を読み込めませんでした。'; trainStatus.hidden = false;
+    }
+  }
+  function setTrains(on) {
+    state.trains = on;
+    clearInterval(trainTimer);
+    if (on) { loadTrains(); trainTimer = setInterval(() => { if (!document.hidden) loadTrains(); }, 30000); }
+    else { trainStatus.hidden = true; redraw(); }
+  }
+
   // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----
   function fly(v, ms) {
     const nv = { ...current, ...v };

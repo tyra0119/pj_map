@@ -406,6 +406,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     document.getElementById('loading').remove();
   }
 
+  // 右ドラッグで回転するので、地図の上ではブラウザの右クリックメニューを出さない
+  document.getElementById('map').addEventListener('contextmenu', (e) => e.preventDefault());
+
   // ---- 操作盤 ----
   const modeBtns = { all: 'modeAll', under: 'modeUnder', above: 'modeAbove' };
   for (const [m, id] of Object.entries(modeBtns)) {

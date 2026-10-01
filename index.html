@@ -245,7 +245,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupkayia').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muplapjf').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupkayia').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muplapjf').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -283,7 +283,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupkayia').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muplapjf').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -894,12 +894,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let trainTick = 0, lastTick = 0;
   const withCum = (pts) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1] }; };
   function trackPath(a, b, li) {
-    const n = Math.max(2, Math.min(30, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 120)));
+    const n = Math.max(2, Math.min(40, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 100)));
     const pts = [];
+    const push = (pt) => { const q = pts[pts.length - 1]; if (!q || q[0] !== pt[0] || q[1] !== pt[1]) pts.push(pt); };
+    let prev = null;
     for (let k = 0; k <= n; k++) {
-      const x = a[0] + (b[0] - a[0]) * k / n, y = a[1] + (b[1] - a[1]) * k / n, q = snap(x, y, li);
-      const pt = q ? [q[0], q[1], q[2]] : [x, y, 0];
-      if (!pts.length || pt[0] !== pts[pts.length - 1][0] || pt[1] !== pts[pts.length - 1][1]) pts.push(pt);
+      const x = a[0] + (b[0] - a[0]) * k / n, y = a[1] + (b[1] - a[1]) * k / n, e = snap(x, y, li);
+      if (!e) { push([x, y, 0]); prev = null; continue; }
+      // 同じ区間の上なら、あいだの点（カーブ）も順にたどる
+      if (prev && prev.s === e.s) {
+        if (e.i > prev.i) for (let j = prev.i + 1; j <= e.i; j++) push(e.s.path[j]);
+        else if (e.i < prev.i) for (let j = prev.i; j > e.i; j--) push(e.s.path[j]);
+      }
+      push(e.p);
+      prev = e;
     }
     return pts;
   }
@@ -994,33 +1002,45 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     return out;
   }
-  const SG = 1000;
+  // 線路の線分（点と点のあいだ）を 500m の格子に入れておき、列車の位置は線分の上に寄せる
+  // （点に寄せると、カーブで隣り合わない点どうしを結んで線路の内側を近道してしまう）
+  const SG = 500;
   function buildSegGrid() {
     segGrid = new Map();
-    for (const s of segs) s.path.forEach(([x, y, z], i) => {
-      const k = Math.floor(x / SG) + ',' + Math.floor(y / SG);
-      if (!segGrid.has(k)) segGrid.set(k, []);
-      segGrid.get(k).push([x, y, z, s.li, s, i]);
-    });
+    for (const s of segs) for (let i = 0; i + 1 < s.path.length; i++) {
+      const [ax, ay] = s.path[i], [bx, by] = s.path[i + 1];
+      const gx0 = Math.floor(Math.min(ax, bx) / SG), gx1 = Math.floor(Math.max(ax, bx) / SG), gy0 = Math.floor(Math.min(ay, by) / SG), gy1 = Math.floor(Math.max(ay, by) / SG);
+      if ((gx1 - gx0 + 1) * (gy1 - gy0 + 1) > 400) continue;
+      for (let gx = gx0; gx <= gx1; gx++) for (let gy = gy0; gy <= gy1; gy++) {
+        const k = gx + ',' + gy;
+        if (!segGrid.has(k)) segGrid.set(k, []);
+        segGrid.get(k).push([s, i]);
+      }
+    }
   }
+  // (x, y) にいちばん近い線分の上の点 { s, i, t, p: [x, y, z] }。li の路線を優先し、無ければほかの路線
   function snap(x, y, li) {
-    let best = null, bd = Infinity;
     for (const want of li.length ? [new Set(li), null] : [null]) {
-      for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 1; gy++) {
-        for (const p of segGrid.get((Math.floor(x / SG) + gx) + ',' + (Math.floor(y / SG) + gy)) || []) {
-          if (want && !want.has(p[3])) continue;
-          const d = (p[0] - x) ** 2 + (p[1] - y) ** 2;
-          if (d < bd) { bd = d; best = p; }
+      let best = null, bd = Infinity;
+      for (let r = 1; r <= 3 && !best; r++) {
+        for (let gx = -r; gx <= r; gx++) for (let gy = -r; gy <= r; gy++) {
+          for (const [s, i] of segGrid.get((Math.floor(x / SG) + gx) + ',' + (Math.floor(y / SG) + gy)) || []) {
+            if (want && !want.has(s.li)) continue;
+            const a = s.path[i], b = s.path[i + 1], dx = b[0] - a[0], dy = b[1] - a[1];
+            const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+            const d = (a[0] + t * dx - x) ** 2 + (a[1] + t * dy - y) ** 2;
+            if (d < bd) { bd = d; best = { s, i, t, p: [a[0] + t * dx, a[1] + t * dy, a[2] + t * (b[2] - a[2])] }; }
+          }
         }
       }
-      if (best) break;
+      if (best) return best;
     }
-    return best;
+    return null;
   }
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupkayia').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muplapjf').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const seen = new Set();
@@ -1030,7 +1050,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         const id = t['owl:sameAs'], rwId = t['odpt:railway'];
         const [rwTitle, li] = odpt.rw[rwId] || ['', []];
         const subway = /Toei\.(Asakusa|Mita|Shinjuku|Oedo)|YokohamaMunicipal/.test(rwId);
-        const lineIdx = li.length ? li[0] : (snap(a[0], a[1], li) || [])[3];
+        const lineIdx = li.length ? li[0] : (snap(a[0], a[1], li) || { s: {} }).s.li;
         const rgb = lineIdx !== undefined ? lines[lineIdx].rgb.slice(0, 3) : [220, 220, 220];
         const destId = (t['odpt:destinationStation'] || [])[0];
         seen.add(id);
@@ -1053,7 +1073,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
           s.path = withCum(pts); s.sm = cont ? 0 : s.path.len / 2; s.speed = subway ? 12 : 17; s.toNext = true;
         } else {
           // 停車中: いまの位置から駅まで数秒で寄せる
-          const q = snap(a[0], a[1], li), st = q ? [q[0], q[1], q[2]] : [a[0], a[1], 0];
+          const q = snap(a[0], a[1], li), st = q ? q.p : [a[0], a[1], 0];
           if (near([st])) { s.path = withCum([prev, st]); s.sm = 0; s.speed = Math.max(subway ? 12 : 17, s.path.len / 4); }
           else { s.path = withCum([st]); s.sm = 0; s.speed = 0; }
           s.toNext = false;

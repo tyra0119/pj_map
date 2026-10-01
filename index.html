@@ -245,7 +245,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupjz6ue').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=mupkayia').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupjz6ue').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupkayia').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -283,7 +283,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupjz6ue').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=mupkayia').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -543,7 +543,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         widthUnits: 'pixels', getWidth: 3, widthMinPixels: 2, billboard: true, capRounded: true, jointRounded: true,
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
-      trainsLayer(),
+      ...trainsLayers(),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
         id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
@@ -584,7 +584,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const l = lines[o.li];
       const where = o.under ? `地下 約 ${Math.round(-o.path[Math.floor(o.path.length / 2)][2])}m` : (o.cat === 'e' ? '高架' : '地上');
       html = `<b style="color:${l.color}">■</b> <b>${l.name}</b><br><span class="sub">${l.op || ''}${l.op ? '・' : ''}${where}</span>`;
-    } else if (info.layer.id === 'trains') {
+    } else if (info.layer.id.startsWith('trains-body')) {
       const delay = o.delay >= 60 ? `<b style="color:#F2B544">${Math.round(o.delay / 60)} 分遅れ</b>` : '遅れなし';
       html = `<b style="color:rgb(${o.rgb.slice(0, 3)})">■</b> <b>${o.rw} ${o.type}</b><br><span class="sub">${o.dest ? o.dest + '行き・' : ''}${o.no}<br>${o.at}・${delay}${o.z < -1 ? `<br>地下 約 ${Math.round(-o.z)}m を走行中` : ''}</span>`;
     } else if (info.layer.id === 'bldg') {
@@ -667,7 +667,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       },
     });
     document.getElementById('loading').remove();
-    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainPos };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains };  // 確認用
   }
 
   // 右ドラッグで回転するので、地図の上ではブラウザの右クリックメニューを出さない
@@ -885,57 +885,114 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const TRAIN_OPS = [['main', 'Toei'], ['main', 'YokohamaMunicipal'], ['challenge', 'JR-East'], ['challenge', 'Tobu'], ['challenge', 'Keio'], ['challenge', 'Keikyu']];
   const TRAIN_TYPE = { Local: '各駅停車', Rapid: '快速', CommuterRapid: '通勤快速', SpecialRapid: '特別快速', ChuoSpecialRapid: '中央特快', OmeSpecialRapid: '青梅特快', LimitedExpress: '特急', Express: '急行', AirportRapidLimitedExpress: 'エアポート快特', RapidLimitedExpress: '快特' };
   let trains = [], odpt = null, trainTimer = 0, segGrid = null;
-  // 読み直したときは、列車ごとに前の位置から新しい位置へ 1.5 秒で動かす（deck の transitions は配列の何番目かで結ぶので、
-  // 列車が増減すると別の列車の位置から飛んでくる）。新しく現れた列車と 4km 以上離れた列車は動かさない
-  let trainAnim = 1, trainRaf = 0;
-  const ease = (u) => u * u * (3 - 2 * u);
-  const trainPos = (t) => {
-    if (!t.from || trainAnim >= 1) return [t.x, t.y, t.z];
-    const e = ease(trainAnim), [x0, y0, z0] = t.from;
-    return [x0 + (t.x - x0) * e, y0 + (t.y - y0) * e, z0 + (t.z - z0) * e];
-  };
-  // 電車の形: 長さ 1・幅 1・高さ 1 の箱の前（+x）を斜めに落とした立体。向きと大きさは列車ごとに
+  // 列車の動き: ODPT は 30 秒ごとに「前の駅と次の駅」しか分からないので、そのあいだも線路に沿って走らせ続ける
+  //  - 駅のあいだ: 平均の速さ（地下鉄 12m/秒、ほか 17m/秒）で次の駅へ。着いたと分かるまでは手前（97%）で待つ
+  //  - 駅に着いた: いまの位置から数秒で駅に寄せて止める
+  //  - 初めて見る列車: 駅のあいだなら真ん中から、停車中なら駅から
+  // 駅のあいだの線路の形は、区間が変わったときに 1 回だけ求めておき、毎回はその上を進めるだけにする
+  const trainMap = new Map();
+  let trainTick = 0, lastTick = 0;
+  const withCum = (pts) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1] }; };
+  function trackPath(a, b, li) {
+    const n = Math.max(2, Math.min(30, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 120)));
+    const pts = [];
+    for (let k = 0; k <= n; k++) {
+      const x = a[0] + (b[0] - a[0]) * k / n, y = a[1] + (b[1] - a[1]) * k / n, q = snap(x, y, li);
+      const pt = q ? [q[0], q[1], q[2]] : [x, y, 0];
+      if (!pts.length || pt[0] !== pts[pts.length - 1][0] || pt[1] !== pts[pts.length - 1][1]) pts.push(pt);
+    }
+    return pts;
+  }
+  // 道すじの s m の位置と向き（度）
+  function pathAt(path, sm, fallbackYaw) {
+    const { pts, cum } = path;
+    if (pts.length < 2) return [...pts[0], fallbackYaw];
+    let i = 1;
+    while (i < pts.length - 1 && cum[i] < sm) i++;
+    const a = pts[i - 1], b = pts[i], f = Math.min(1, Math.max(0, (sm - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1)));
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI];
+  }
+  function tickTrains() {
+    const now = performance.now(), dt = Math.min(1, (now - (lastTick || now)) / 1000);
+    lastTick = now;
+    trains = [];
+    for (const s of trainMap.values()) {
+      const limit = s.toNext ? s.path.len * 0.97 : s.path.len;
+      s.sm = Math.min(limit, s.sm + s.speed * dt);
+      const [x, y, z, yaw] = pathAt(s.path, s.sm, s.yaw);
+      s.cur = [x, y, z]; s.yaw = yaw;
+      trains.push({ ...s.info, id: s.id, x, y, z, yaw });
+    }
+    // 列車の層だけ差し替える（ほかの層は作り直さない）
+    if (!deckgl) return;
+    const fresh = trainsLayers();
+    lastLayers = lastLayers.flatMap((l) => (!l.id.startsWith('trains-') ? [l] : l.id === 'trains-body-u' ? fresh : []));
+    deckgl.setProps({ layers: lastLayers });
+  }
+  // 電車の形: 長さ 1（前が +x）・幅 1・高さ 1 の中に、3 両の車体、窓の帯、屋根、先頭の窓を別々の形として作る
+  // 色を変えるために 3 つの層（車体＝路線の色、窓＝濃い紺、屋根＝明るい灰色）に分ける
   const TRAIN_MESH = (() => {
-    const P = [], N = [];
-    const quad = (...v) => {
+    const make = () => ({ P: [], N: [] });
+    const quad = (m, ...v) => {
       const [a, b, c] = v, u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
       let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
       const l = Math.hypot(...n) || 1; n = n.map((x) => x / l);
-      for (const i of [0, 1, 2, 0, 2, 3]) { P.push(...v[i]); N.push(...n); }
+      for (const i of [0, 1, 2, 0, 2, 3]) { m.P.push(...v[i]); m.N.push(...n); }
     };
-    const R = [[-0.5, -0.5, 0], [-0.5, 0.5, 0], [-0.5, 0.5, 1], [-0.5, -0.5, 1]];
-    const S = [[0.3, -0.5, 0], [0.3, 0.5, 0], [0.3, 0.5, 1], [0.3, -0.5, 1]];
-    const F = [[0.5, -0.42, 0], [0.5, 0.42, 0], [0.5, 0.42, 0.5], [0.5, -0.42, 0.5]];
-    quad(R[0], R[3], R[2], R[1]);                                  // 後ろ
-    quad(R[0], S[0], S[3], R[3]); quad(R[1], R[2], S[2], S[1]);    // 側面
-    quad(R[3], S[3], S[2], R[2]); quad(R[0], R[1], S[1], S[0]);    // 屋根・床
-    quad(S[0], F[0], F[3], S[3]); quad(S[1], S[2], F[2], F[1]);    // 先頭の側面
-    quad(S[3], F[3], F[2], S[2]); quad(F[0], F[1], F[2], F[3]);    // 先頭の斜め・前面
-    quad(S[0], S[1], F[1], F[0]);
-    return { attributes: { POSITION: { value: new Float32Array(P), size: 3 }, NORMAL: { value: new Float32Array(N), size: 3 }, TEXCOORD_0: { value: new Float32Array(P.length / 3 * 2), size: 2 } } };
-  })();
-  function trainsLayer() {
-    // 近くでは実物に近い大きさ（10 両で 200m・幅 3.5m・高さ 4m）。縮小したときは画面で長さ 30・幅 5・高さ 4.5 ピクセルより小さくしない
-    const mpp = 2 ** -current.zoom, L = Math.max(200, 30 * mpp), W = Math.max(3.5, 5 * mpp), H = Math.max(4, 4.5 * mpp);
-    return new deck.SimpleMeshLayer({
-      id: 'trains', data: state.trains ? trains : [], mesh: TRAIN_MESH,
-      // 深さの倍率は位置だけにかける（modelMatrix を使うと電車の形まで縦に伸びるので）
-      getPosition: (d) => { const p = trainPos(d); return [p[0], p[1], p[2] * state.exag]; },
-      getOrientation: (d) => [0, d.yaw, 0], getScale: [L, W, H], getColor: (d) => d.rgb,
-      updateTriggers: { getPosition: [trainAnim, trains, state.exag], getScale: [L, W, H] },
-      material: { ambient: 0.55, diffuse: 0.6, shininess: 24, specularColor: [90, 90, 90] }, pickable: true,
+    // 直方体。front が 0 より大きいとき、前の上側を斜めに落とす（先頭車）
+    const box = (m, x0, x1, y0, y1, z0, z1, front = 0) => {
+      const xf = x1 - front, zt = front ? z0 + (z1 - z0) * 0.55 : z1;
+      const R = [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]];
+      const S = [[xf, y0, z0], [xf, y1, z0], [xf, y1, z1], [xf, y0, z1]];
+      const F = [[x1, y0, z0], [x1, y1, z0], [x1, y1, zt], [x1, y0, zt]];
+      quad(m, R[0], R[3], R[2], R[1]);
+      quad(m, R[0], S[0], S[3], R[3]); quad(m, R[1], R[2], S[2], S[1]);
+      quad(m, R[3], S[3], S[2], R[2]); quad(m, R[0], R[1], S[1], S[0]);
+      if (front) {
+        quad(m, S[0], F[0], F[3], S[3]); quad(m, S[1], S[2], F[2], F[1]);
+        quad(m, S[3], F[3], F[2], S[2]); quad(m, S[0], S[1], F[1], F[0]);
+      }
+      quad(m, F[0], F[1], F[2], F[3]);
+    };
+    const body = make(), win = make(), roof = make();
+    const cars = [[-0.5, -0.18], [-0.16, 0.16], [0.18, 0.5]];
+    cars.forEach(([x0, x1], i) => {
+      const nose = i === 2 ? 0.1 : 0;
+      box(body, x0, x1, -0.5, 0.5, 0, 0.92, nose);
+      // 窓の帯（左右の側面の少し外側）
+      box(win, x0 + 0.025, x1 - 0.025 - nose, 0.5, 0.53, 0.45, 0.75);
+      box(win, x0 + 0.025, x1 - 0.025 - nose, -0.53, -0.5, 0.45, 0.75);
+      // 屋根（真ん中の帯。上から見ても路線の色が縁に見えるように）
+      box(roof, x0 + 0.02, x1 - 0.02 - nose, -0.3, 0.3, 0.92, 1.0);
     });
-  }
-  function animateTrains() {
-    cancelAnimationFrame(trainRaf);
-    const t0 = performance.now();
-    const step = (now) => {
-      trainAnim = Math.min(1, (now - t0) / 1500);
-      // 列車の層だけ差し替える（ほかの層は作り直さない）
-      deckgl.setProps({ layers: lastLayers.map((l) => (l.id === 'trains' ? trainsLayer() : l)) });
-      if (trainAnim < 1) trainRaf = requestAnimationFrame(step);
-    };
-    trainRaf = requestAnimationFrame(step);
+    // 先頭の窓（斜めの面の上に重ねる）
+    box(win, 0.405, 0.47, -0.4, 0.4, 0.6, 0.8);
+    const toMesh = (m) => ({ attributes: { POSITION: { value: new Float32Array(m.P), size: 3 }, NORMAL: { value: new Float32Array(m.N), size: 3 }, TEXCOORD_0: { value: new Float32Array(m.P.length / 3 * 2), size: 2 } } });
+    return { body: toMesh(body), win: toMesh(win), roof: toMesh(roof) };
+  })();
+  // 地下を走る電車は、地下の線と同じように少し薄くし、地面から電車までの細い縦線を付ける（地上にいるように見えないように）
+  function trainsLayers() {
+    // 近くでは実物に近い大きさ（10 両で 200m・幅 3.5m・高さ 4m）。縮小したときは画面で長さ 40・幅 9・高さ 8 ピクセルより小さくしない
+    const mpp = 2 ** -current.zoom, L = Math.max(200, 40 * mpp), W = Math.max(3.5, 9 * mpp), H = Math.max(4, 8 * mpp);
+    const data = state.trains ? trains : [];
+    const pos = (d) => [d.x, d.y, d.z * state.exag];
+    const trig = { getPosition: [trains, state.exag], getScale: [L, W, H] };
+    const out = [];
+    for (const under of [true, false]) {
+      const dd = data.filter((d) => (d.z < -1) === under);
+      const common = { data: dd, getPosition: pos, getOrientation: (d) => [0, d.yaw, 0], getScale: [L, W, H], updateTriggers: trig, opacity: under ? 0.7 : 1 };
+      const sfx = under ? '-u' : '-a';
+      out.push(
+        new deck.SimpleMeshLayer({ ...common, id: 'trains-body' + sfx, mesh: TRAIN_MESH.body, getColor: (d) => d.rgb, pickable: true, material: { ambient: 0.5, diffuse: 0.65, shininess: 20, specularColor: [80, 80, 80] } }),
+        new deck.SimpleMeshLayer({ ...common, id: 'trains-win' + sfx, mesh: TRAIN_MESH.win, getColor: [22, 30, 46, 255], material: { ambient: 0.7, diffuse: 0.3, shininess: 40, specularColor: [140, 160, 190] } }),
+        new deck.SimpleMeshLayer({ ...common, id: 'trains-roof' + sfx, mesh: TRAIN_MESH.roof, getColor: [214, 220, 228, 255], material: { ambient: 0.6, diffuse: 0.5 } }),
+      );
+      if (under) out.push(new deck.LineLayer({
+        id: 'trains-drop', data: dd, getSourcePosition: (d) => { const p = pos(d); return [p[0], p[1], 0]; }, getTargetPosition: pos,
+        getColor: (d) => [...d.rgb.slice(0, 3), 110], getWidth: 1, widthUnits: 'pixels', updateTriggers: { getSourcePosition: trig.getPosition, getTargetPosition: trig.getPosition },
+      }));
+    }
+    return out;
   }
   const SG = 1000;
   function buildSegGrid() {
@@ -963,46 +1020,50 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupjz6ue').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupkayia').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
-      const next = [];
+      const seen = new Set();
       for (const t of lists.flat()) {
         const a = odpt.st[t['odpt:fromStation']], b = t['odpt:toStation'] ? odpt.st[t['odpt:toStation']] : null;
         if (!a) continue;
-        const [rwTitle, li] = odpt.rw[t['odpt:railway']] || ['', []];
-        const mx = b ? (a[0] + b[0]) / 2 : a[0], my = b ? (a[1] + b[1]) / 2 : a[1];
-        const p = snap(mx, my, li);
-        const lineIdx = p ? p[3] : li[0];
-        // 向き: 線路の向き（前後の点から）を、前の駅 → 次の駅の向きにそろえる
-        let heading = b ? Math.atan2(b[1] - a[1], b[0] - a[0]) : 0;
-        if (p) {
-          const path = p[4].path, q0 = path[Math.max(0, p[5] - 1)], q1 = path[Math.min(path.length - 1, p[5] + 1)];
-          let tx = q1[0] - q0[0], ty = q1[1] - q0[1];
-          if (b && tx * (b[0] - a[0]) + ty * (b[1] - a[1]) < 0) { tx = -tx; ty = -ty; }
-          if (tx || ty) heading = Math.atan2(ty, tx);
-        }
+        const id = t['owl:sameAs'], rwId = t['odpt:railway'];
+        const [rwTitle, li] = odpt.rw[rwId] || ['', []];
+        const subway = /Toei\.(Asakusa|Mita|Shinjuku|Oedo)|YokohamaMunicipal/.test(rwId);
+        const lineIdx = li.length ? li[0] : (snap(a[0], a[1], li) || [])[3];
         const rgb = lineIdx !== undefined ? lines[lineIdx].rgb.slice(0, 3) : [220, 220, 220];
         const destId = (t['odpt:destinationStation'] || [])[0];
-        next.push({
-          id: t['owl:sameAs'], x: p ? p[0] : mx, y: p ? p[1] : my, z: p ? p[2] : 0, rgb: [...rgb, 255], yaw: heading * 180 / Math.PI,
-          rw: rwTitle, no: t['odpt:trainNumber'], type: TRAIN_TYPE[(t['odpt:trainType'] || '').split('.').pop()] || '',
-          dest: destId && odpt.st[destId] ? odpt.st[destId][2] : '', delay: t['odpt:delay'] || 0,
-          at: b ? `${a[2]}→${b[2]}` : `${a[2]}に停車中`,
-        });
+        seen.add(id);
+        let s = trainMap.get(id);
+        const prev = s ? s.cur : null;
+        if (!s) { s = { id, yaw: b ? Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI : 0 }; trainMap.set(id, s); }
+        s.info = {
+          rgb: [...rgb, 255], rw: rwTitle, no: t['odpt:trainNumber'], type: TRAIN_TYPE[(t['odpt:trainType'] || '').split('.').pop()] || '',
+          dest: destId && odpt.st[destId] ? odpt.st[destId][2] : '', delay: t['odpt:delay'] || 0, at: b ? `${a[2]}→${b[2]}` : `${a[2]}に停車中`,
+        };
+        const key = t['odpt:fromStation'] + '>' + (t['odpt:toStation'] || '');
+        if (s.key === key) continue; // 同じ区間ならそのまま走らせ続ける
+        s.key = key;
+        const near = (pts) => prev && Math.hypot(prev[0] - pts[0][0], prev[1] - pts[0][1]) < 3000;
+        if (b) {
+          // 駅のあいだ: いまの位置から次の駅まで（初めて見る列車は真ん中から）
+          let pts = trackPath(a, b, li);
+          const cont = near(pts);
+          if (cont) pts = [prev, ...pts];
+          s.path = withCum(pts); s.sm = cont ? 0 : s.path.len / 2; s.speed = subway ? 12 : 17; s.toNext = true;
+        } else {
+          // 停車中: いまの位置から駅まで数秒で寄せる
+          const q = snap(a[0], a[1], li), st = q ? [q[0], q[1], q[2]] : [a[0], a[1], 0];
+          if (near([st])) { s.path = withCum([prev, st]); s.sm = 0; s.speed = Math.max(subway ? 12 : 17, s.path.len / 4); }
+          else { s.path = withCum([st]); s.sm = 0; s.speed = 0; }
+          s.toNext = false;
+        }
       }
-      const old = new Map(trains.map((t) => [t.id, trainPos(t)]));
-      for (const t of next) {
-        const o = old.get(t.id);
-        t.from = o && Math.hypot(o[0] - t.x, o[1] - t.y) < 4000 && (o[0] !== t.x || o[1] !== t.y) ? o : null;
-      }
-      trainAnim = 0;
-      trains = next;
+      for (const id of [...trainMap.keys()]) if (!seen.has(id)) trainMap.delete(id);
+      tickTrains();
       const now = new Date();
-      trainStatus.textContent = next.length ? `${next.length} 本（${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）。位置は駅と駅の中間あたりの目安です。` : '走っている列車が取れませんでした（運転時間外か、中継サーバが止まっています）。';
+      trainStatus.textContent = trainMap.size ? `${trainMap.size} 本（${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）。駅のあいだは平均の速さで走らせた目安の位置です。` : '走っている列車が取れませんでした（運転時間外か、中継サーバが止まっています）。';
       trainStatus.hidden = false;
-      redraw();
-      animateTrains();
     } catch (e) {
       trainStatus.textContent = '列車の位置を読み込めませんでした。'; trainStatus.hidden = false;
     }
@@ -1010,8 +1071,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   function setTrains(on) {
     state.trains = on;
     clearInterval(trainTimer);
-    if (on) { loadTrains(); trainTimer = setInterval(() => { if (!document.hidden) loadTrains(); }, 30000); }
-    else { trainStatus.hidden = true; redraw(); }
+    clearInterval(trainTick);
+    if (on) {
+      loadTrains();
+      trainTimer = setInterval(() => { if (!document.hidden) loadTrains(); }, 30000);
+      lastTick = 0;
+      trainTick = setInterval(() => { if (!document.hidden && trainMap.size) tickTrains(); else lastTick = 0; }, 66);
+    } else { trainMap.clear(); trains = []; trainStatus.hidden = true; redraw(); }
   }
 
   // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----

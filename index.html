@@ -156,8 +156,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <label class="check"><input type="checkbox" id="showNames" checked> 駅名を表示</label>
   <label class="check"><input type="checkbox" id="showMap" checked> 地図を表示</label>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showBldg"> ビルを重ねる（23区・高さ 31m 以上）</label>
-    <p class="hint" id="bldgLoading" hidden>ビルのデータ（約 2MB）を読み込んでいます…</p>
+    <label class="check"><input type="checkbox" id="showBldg"> ビルを重ねる（主な都市・高さ 31m 以上）</label>
+    <p class="hint" id="bldgLoading" hidden>ビルのデータを読み込んでいます…</p>
     <p class="hint" id="bldgHint" hidden>ビルの高さも地下の深さと同じ倍率で引き伸ばしています。倍率を ×2 に下げました（地下鉄の深さもそのぶん浅く見えます）。</p>
   </div>
 
@@ -167,7 +167,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <button id="clearPick">選択を外す</button>
   </div>
 
-  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>ビル: 「3D都市モデル（Project PLATEAU）東京都23区（2020年度）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
 </aside>
 <div class="tip" id="tip" hidden></div>
 
@@ -199,18 +199,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const wards = D.labels.filter((l) => !l[3]).map(([name, x, y]) => ({ name, x, y }));
   const prefLabels = D.labels.filter((l) => l[3]).map(([name, x, y]) => ({ name, x, y }));
   const decRing = (enc) => { const p = []; let x = 0, y = 0; for (let k = 0; k < enc.length; k += 2) { x += enc[k]; y += enc[k + 1]; p.push([x, y]); } return p; };
-  // ビルは「ビルを重ねる」を入れたときに読み込む
-  let bldgs = [], bldgLoad = null;
-  function loadBldg() {
-    if (!bldgLoad) {
-      document.getElementById('bldgLoading').hidden = false;
-      bldgLoad = fetch('bldg.json').then((r) => r.json()).then((B) => {
-        bldgs = B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) }));
-        document.getElementById('bldgLoading').hidden = true;
+  // ビルは「ビルを重ねる」を入れたときに、見ている範囲にかかる都市のファイルだけ読み込む（bldg/index.json に都市ごとの範囲）
+  let bldgs = [], bldgIndex = null;
+  const bldgLoaded = new Set();
+  let bldgPending = 0;
+  async function loadBldg(box) {
+    const msg = document.getElementById('bldgLoading');
+    try {
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json').then((r) => r.json());
+    } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
+    const M = 5000;
+    const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
+    for (const f of want) {
+      bldgLoaded.add(f.f);
+      bldgPending++;
+      msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
+      fetch('bldg/' + f.f).then((r) => r.json()).then((B) => {
+        bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
-      }).catch(() => { bldgLoad = null; document.getElementById('bldgLoading').textContent = 'ビルのデータを読み込めませんでした。'; });
+      }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
     }
-    return bldgLoad;
   }
   // 高さで色を変える（低い: 暗い青灰 → 高い: 白っぽい青）。琥珀色は駅に使っているので避ける
   const bldgColor = (d) => { const t = Math.min(1, Math.max(0, (d.h - 31) / 170)) ** 0.7; return [Math.round(70 + 130 * t), Math.round(84 + 130 * t), Math.round(106 + 128 * t), 225]; };
@@ -328,12 +336,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   }
   DarkTileLayer.layerName = 'DarkTileLayer';
   let tileKey = '';
-  function tilesFor() {
+  // 見えている地面の範囲 [x0, y0, x1, y1]（画面の格子点を地面 z=0 に落とす。地平線より上の点は除き、遠くは中心から画面 3 枚ぶんまで）
+  function viewBox() {
     const el = document.getElementById('map');
     const W = el.clientWidth, H = el.clientHeight;
-    if (!W || !current) return [];
+    if (!W || !current) return null;
     const vp = VIEW.makeViewport({ width: W, height: H, viewState: current });
-    // 画面の格子点を地面（z=0）に落として、見えている範囲を求める（地平線より上の点は除く）
     const [tx, ty] = current.target, span = 3 * Math.max(W, H) / 2 ** current.zoom;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
@@ -342,7 +350,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const px = Math.min(tx + span, Math.max(tx - span, p[0])), py = Math.min(ty + span, Math.max(ty - span, p[1]));
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     }
-    if (!(x1 > x0)) return [];
+    return x1 > x0 ? [x0, y0, x1, y1] : null;
+  }
+  function tilesFor() {
+    const box = viewBox();
+    if (!box) return [];
+    const [x0, y0, x1, y1] = box;
     // 画面の中心で 1 ピクセルがタイルの 1 ピクセルくらいになるズーム。枚数が多すぎるときは下げる
     let z = Math.max(5, Math.min(18, Math.round(Math.log2(K * 2 * WM / 256 * 2 ** current.zoom))));
     const range = (zz) => {
@@ -371,6 +384,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (refreshTimer) return;
     refreshTimer = setTimeout(() => {
       refreshTimer = 0;
+      if (state.bldg && bldgIndex) loadBldg(viewBox());
       const before = labelKey + '#' + tileKey;
       const L = layers();
       if (labelKey + '#' + tileKey !== before) deckgl.setProps({ layers: L });
@@ -538,6 +552,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       views: VIEW,
       initialViewState: { ...current, ...LIMITS },
       controller: { inertia: true, dragMode: 'pan', touchRotate: true },
+      // 線は細いので、触れた位置から少し離れていても拾う（指で触るときは広めに）
+      pickingRadius: window.matchMedia('(pointer: coarse)').matches ? 14 : 10,
       parameters: { clearColor: [10 / 255, 15 / 255, 21 / 255, 1] },
       layers: layers(),
       onHover, onClick,
@@ -651,7 +667,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   document.getElementById('showBldg').addEventListener('change', (e) => {
     state.bldg = e.target.checked;
     tip.hidden = true;
-    if (state.bldg) loadBldg();
+    if (state.bldg) loadBldg(viewBox());
     // ×45 のままだと 200m のビルが 9km の塔になるので、重ねるときは倍率を下げる
     const lower = state.bldg && state.exag > 10;
     if (lower) { state.exag = 2; exag.value = 2; document.getElementById('exagVal').textContent = '×2'; }

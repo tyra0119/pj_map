@@ -459,7 +459,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       if (state.bldg && bldgIndex) loadBldg(viewBox());
       const before = labelKey + '#' + tileKey;
       const L = layers();
-      if (labelKey + '#' + tileKey !== before) deckgl.setProps({ layers: L });
+      if (labelKey + '#' + tileKey !== before) deckgl.setProps({ layers: (lastLayers = L) });
     }, 120);
   }
 
@@ -541,12 +541,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         widthUnits: 'pixels', getWidth: 3, widthMinPixels: 2, billboard: true, capRounded: true, jointRounded: true,
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
-      // 走っている列車（ODPT）。読み直すたびに位置がなめらかに動く
-      new deck.ScatterplotLayer({
-        id: 'trains', data: state.trains ? trains : [], getPosition: (d) => [d.x, d.y, d.z], getRadius: 5.5, radiusUnits: 'pixels',
-        stroked: true, getFillColor: (d) => d.rgb, getLineColor: [255, 255, 255, 230], lineWidthUnits: 'pixels', getLineWidth: 1.5,
-        billboard: true, modelMatrix: mm, pickable: true, transitions: { getPosition: 1500 },
-      }),
+      trainsLayer(mm),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
         id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
@@ -623,7 +618,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 
   // ---- 地図 ----
   let deckgl;
-  function redraw() { if (deckgl) deckgl.setProps({ layers: layers() }); }
+  let lastLayers = [];
+  function redraw() { if (deckgl) deckgl.setProps({ layers: (lastLayers = layers()) }); }
   // 見る角度だけ変え、いまの場所と拡大率はそのまま（「最初の位置に戻る」だけは全部戻す）
   function go(name) {
     const v = name === 'home' ? VIEWS.tilt : { ...VIEWS[name], target: current.target, zoom: current.zoom };
@@ -654,7 +650,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       // 線は細いので、触れた位置から少し離れていても拾う（指で触るときは広めに）
       pickingRadius: window.matchMedia('(pointer: coarse)').matches ? 14 : 10,
       parameters: { clearColor: [10 / 255, 15 / 255, 21 / 255, 1] },
-      layers: layers(),
+      layers: (lastLayers = layers()),
       onHover, onClick,
       getCursor: ({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab'),
       onViewStateChange: ({ viewState: vs0 }) => {
@@ -669,7 +665,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       },
     });
     document.getElementById('loading').remove();
-    window.rail3d = { deck: deckgl, state, pick, flyLine, lines };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainPos };  // 確認用
   }
 
   // 右ドラッグで回転するので、地図の上ではブラウザの右クリックメニューを出さない
@@ -885,6 +881,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const RELAY = 'https://tyra.jp/odpt/api';
   const TRAIN_TYPE = { Local: '各駅停車', Rapid: '快速', CommuterRapid: '通勤快速', SpecialRapid: '特別快速', ChuoSpecialRapid: '中央特快', OmeSpecialRapid: '青梅特快', LimitedExpress: '特急', Express: '急行', AirportRapidLimitedExpress: 'エアポート快特', RapidLimitedExpress: '快特' };
   let trains = [], odpt = null, trainTimer = 0, segGrid = null;
+  // 読み直したときは、列車ごとに前の位置から新しい位置へ 1.5 秒で動かす（deck の transitions は配列の何番目かで結ぶので、
+  // 列車が増減すると別の列車の位置から飛んでくる）。新しく現れた列車と 4km 以上離れた列車は動かさない
+  let trainAnim = 1, trainRaf = 0;
+  const ease = (u) => u * u * (3 - 2 * u);
+  const trainPos = (t) => {
+    if (!t.from || trainAnim >= 1) return [t.x, t.y, t.z];
+    const e = ease(trainAnim), [x0, y0, z0] = t.from;
+    return [x0 + (t.x - x0) * e, y0 + (t.y - y0) * e, z0 + (t.z - z0) * e];
+  };
+  function trainsLayer(mm) {
+    return new deck.ScatterplotLayer({
+      id: 'trains', data: state.trains ? trains : [], getPosition: trainPos, updateTriggers: { getPosition: [trainAnim, trains] },
+      getRadius: 5.5, radiusUnits: 'pixels', stroked: true, getFillColor: (d) => d.rgb, getLineColor: [255, 255, 255, 230],
+      lineWidthUnits: 'pixels', getLineWidth: 1.5, billboard: true, modelMatrix: mm, pickable: true,
+    });
+  }
+  function animateTrains() {
+    cancelAnimationFrame(trainRaf);
+    const t0 = performance.now();
+    const step = (now) => {
+      trainAnim = Math.min(1, (now - t0) / 1500);
+      // 列車の層だけ差し替える（ほかの層は作り直さない）
+      deckgl.setProps({ layers: lastLayers.map((l) => (l.id === 'trains' ? trainsLayer(modelMatrix()) : l)) });
+      if (trainAnim < 1) trainRaf = requestAnimationFrame(step);
+    };
+    trainRaf = requestAnimationFrame(step);
+  }
   const SG = 1000;
   function buildSegGrid() {
     segGrid = new Map();
@@ -931,13 +954,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
           at: b ? `${a[2]}→${b[2]}` : `${a[2]}に停車中`,
         });
       }
-      // 同じ列車は同じ順番に並べて、位置がなめらかに動くようにする
-      next.sort((p, q) => (p.id < q.id ? -1 : 1));
+      const old = new Map(trains.map((t) => [t.id, trainPos(t)]));
+      for (const t of next) {
+        const o = old.get(t.id);
+        t.from = o && Math.hypot(o[0] - t.x, o[1] - t.y) < 4000 && (o[0] !== t.x || o[1] !== t.y) ? o : null;
+      }
+      trainAnim = 0;
       trains = next;
       const now = new Date();
       trainStatus.textContent = next.length ? `${next.length} 本（${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）。位置は駅と駅の中間あたりの目安です。` : '走っている列車が取れませんでした（運転時間外か、中継サーバが止まっています）。';
       trainStatus.hidden = false;
       redraw();
+      animateTrains();
     } catch (e) {
       trainStatus.textContent = '列車の位置を読み込めませんでした。'; trainStatus.hidden = false;
     }

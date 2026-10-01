@@ -199,7 +199,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <label class="check"><input type="checkbox" id="showNames" checked> 駅名を表示</label>
   <label class="check"><input type="checkbox" id="showMap" checked> 地図を表示</label>
   <div class="group">
-    <label class="check"><input type="checkbox" id="showTrains"> 走っている列車（都営・JR東日本）</label>
+    <label class="check"><input type="checkbox" id="showTrains"> 走っている列車</label>
     <p class="hint" id="trainStatus" hidden></p>
   </div>
   <div class="group">
@@ -223,7 +223,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
   </div>
 
-  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>列車の位置: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a>（都営・JR東日本）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（淡色地図を加工）<br>列車の位置: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a>（都営・横浜市営・JR東日本・東武・京王・京急）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
 </aside>
 <div class="tip" id="tip" hidden></div>
 <div class="mapctl" role="group" aria-label="地図の操作">
@@ -451,15 +451,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const FLOOD = [null, ['0.5m 未満', 0.5, [247, 245, 169]], ['0.5〜3m', 3, [255, 216, 192]], ['3〜5m', 5, [255, 183, 183]], ['5〜10m', 10, [255, 145, 145]], ['10〜20m', 20, [242, 133, 201]], ['20m 以上', 20, [220, 122, 220]]];
 
   // 視点が動いたら、駅名の間引きと地図のタイルを求め直し、変わったときだけ描き直す
-  let refreshTimer = 0;
+  let refreshTimer = 0, lastZoomKey = 0;
   function scheduleRefresh() {
     if (refreshTimer) return;
     refreshTimer = setTimeout(() => {
       refreshTimer = 0;
       if (state.bldg && bldgIndex) loadBldg(viewBox());
-      const before = labelKey + '#' + tileKey;
+      const zk = state.trains ? Math.round(current.zoom * 3) : 0;
+      const before = labelKey + '#' + tileKey + '#' + lastZoomKey;
       const L = layers();
-      if (labelKey + '#' + tileKey !== before) deckgl.setProps({ layers: (lastLayers = L) });
+      lastZoomKey = zk;
+      if (labelKey + '#' + tileKey + '#' + zk !== before) deckgl.setProps({ layers: (lastLayers = L) });
     }, 120);
   }
 
@@ -541,7 +543,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         widthUnits: 'pixels', getWidth: 3, widthMinPixels: 2, billboard: true, capRounded: true, jointRounded: true,
         pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 200], modelMatrix: mm,
       }),
-      trainsLayer(mm),
+      trainsLayer(),
       // 駅の浸水の深さ（想定最大規模の段階の上限）を、地面から上へ水の円柱で。深さと同じ倍率
       new deck.ColumnLayer({
         id: 'flood-cols', data: state.flood ? st.filter((s) => s.flood) : [], getPosition: (d) => [d.x, d.y, 0], diskResolution: 16, radius: 45,
@@ -877,8 +879,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 
   // ---- 走っている列車 ----
   // ODPT の列車は「前の駅と次の駅」しか分からないので、2 駅の中間に近い、対応する路線の線路の上に置く（停車中は駅に）
-  // 中継サーバ（tyra.jp/odpt/api）経由。都営は main、JR 東日本は challenge。30 秒ごとに読み直す
+  // 中継サーバ（tyra.jp/odpt/api）経由。30 秒ごとに読み直す
   const RELAY = 'https://tyra.jp/odpt/api';
+  // 中継で列車の位置が取れる事業者（main は一般公開、challenge はチャレンジ限定）。東京メトロ・小田急・東急・西武などは 0 本だった
+  const TRAIN_OPS = [['main', 'Toei'], ['main', 'YokohamaMunicipal'], ['challenge', 'JR-East'], ['challenge', 'Tobu'], ['challenge', 'Keio'], ['challenge', 'Keikyu']];
   const TRAIN_TYPE = { Local: '各駅停車', Rapid: '快速', CommuterRapid: '通勤快速', SpecialRapid: '特別快速', ChuoSpecialRapid: '中央特快', OmeSpecialRapid: '青梅特快', LimitedExpress: '特急', Express: '急行', AirportRapidLimitedExpress: 'エアポート快特', RapidLimitedExpress: '快特' };
   let trains = [], odpt = null, trainTimer = 0, segGrid = null;
   // 読み直したときは、列車ごとに前の位置から新しい位置へ 1.5 秒で動かす（deck の transitions は配列の何番目かで結ぶので、
@@ -890,11 +894,36 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const e = ease(trainAnim), [x0, y0, z0] = t.from;
     return [x0 + (t.x - x0) * e, y0 + (t.y - y0) * e, z0 + (t.z - z0) * e];
   };
-  function trainsLayer(mm) {
-    return new deck.ScatterplotLayer({
-      id: 'trains', data: state.trains ? trains : [], getPosition: trainPos, updateTriggers: { getPosition: [trainAnim, trains] },
-      getRadius: 5.5, radiusUnits: 'pixels', stroked: true, getFillColor: (d) => d.rgb, getLineColor: [255, 255, 255, 230],
-      lineWidthUnits: 'pixels', getLineWidth: 1.5, billboard: true, modelMatrix: mm, pickable: true,
+  // 電車の形: 長さ 1・幅 1・高さ 1 の箱の前（+x）を斜めに落とした立体。向きと大きさは列車ごとに
+  const TRAIN_MESH = (() => {
+    const P = [], N = [];
+    const quad = (...v) => {
+      const [a, b, c] = v, u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+      const l = Math.hypot(...n) || 1; n = n.map((x) => x / l);
+      for (const i of [0, 1, 2, 0, 2, 3]) { P.push(...v[i]); N.push(...n); }
+    };
+    const R = [[-0.5, -0.5, 0], [-0.5, 0.5, 0], [-0.5, 0.5, 1], [-0.5, -0.5, 1]];
+    const S = [[0.3, -0.5, 0], [0.3, 0.5, 0], [0.3, 0.5, 1], [0.3, -0.5, 1]];
+    const F = [[0.5, -0.42, 0], [0.5, 0.42, 0], [0.5, 0.42, 0.5], [0.5, -0.42, 0.5]];
+    quad(R[0], R[3], R[2], R[1]);                                  // 後ろ
+    quad(R[0], S[0], S[3], R[3]); quad(R[1], R[2], S[2], S[1]);    // 側面
+    quad(R[3], S[3], S[2], R[2]); quad(R[0], R[1], S[1], S[0]);    // 屋根・床
+    quad(S[0], F[0], F[3], S[3]); quad(S[1], S[2], F[2], F[1]);    // 先頭の側面
+    quad(S[3], F[3], F[2], S[2]); quad(F[0], F[1], F[2], F[3]);    // 先頭の斜め・前面
+    quad(S[0], S[1], F[1], F[0]);
+    return { attributes: { POSITION: { value: new Float32Array(P), size: 3 }, NORMAL: { value: new Float32Array(N), size: 3 }, TEXCOORD_0: { value: new Float32Array(P.length / 3 * 2), size: 2 } } };
+  })();
+  function trainsLayer() {
+    // 近くでは実物に近い大きさ（10 両で 200m・幅 3.5m・高さ 4m）。縮小したときは画面で長さ 30・幅 5・高さ 4.5 ピクセルより小さくしない
+    const mpp = 2 ** -current.zoom, L = Math.max(200, 30 * mpp), W = Math.max(3.5, 5 * mpp), H = Math.max(4, 4.5 * mpp);
+    return new deck.SimpleMeshLayer({
+      id: 'trains', data: state.trains ? trains : [], mesh: TRAIN_MESH,
+      // 深さの倍率は位置だけにかける（modelMatrix を使うと電車の形まで縦に伸びるので）
+      getPosition: (d) => { const p = trainPos(d); return [p[0], p[1], p[2] * state.exag]; },
+      getOrientation: (d) => [0, d.yaw, 0], getScale: [L, W, H], getColor: (d) => d.rgb,
+      updateTriggers: { getPosition: [trainAnim, trains, state.exag], getScale: [L, W, H] },
+      material: { ambient: 0.55, diffuse: 0.6, shininess: 24, specularColor: [90, 90, 90] }, pickable: true,
     });
   }
   function animateTrains() {
@@ -903,7 +932,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const step = (now) => {
       trainAnim = Math.min(1, (now - t0) / 1500);
       // 列車の層だけ差し替える（ほかの層は作り直さない）
-      deckgl.setProps({ layers: lastLayers.map((l) => (l.id === 'trains' ? trainsLayer(modelMatrix()) : l)) });
+      deckgl.setProps({ layers: lastLayers.map((l) => (l.id === 'trains' ? trainsLayer() : l)) });
       if (trainAnim < 1) trainRaf = requestAnimationFrame(step);
     };
     trainRaf = requestAnimationFrame(step);
@@ -911,11 +940,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const SG = 1000;
   function buildSegGrid() {
     segGrid = new Map();
-    for (const s of segs) for (const [x, y, z] of s.path) {
+    for (const s of segs) s.path.forEach(([x, y, z], i) => {
       const k = Math.floor(x / SG) + ',' + Math.floor(y / SG);
       if (!segGrid.has(k)) segGrid.set(k, []);
-      segGrid.get(k).push([x, y, z, s.li]);
-    }
+      segGrid.get(k).push([x, y, z, s.li, s, i]);
+    });
   }
   function snap(x, y, li) {
     let best = null, bd = Infinity;
@@ -935,7 +964,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadTrains() {
     try {
       if (!odpt) { odpt = await fetch('odpt.json').then((r) => r.json()); buildSegGrid(); }
-      const lists = await Promise.all([['main', 'Toei'], ['challenge', 'JR-East']].map(([up, op]) =>
+      const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = [];
       for (const t of lists.flat()) {
@@ -945,10 +974,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         const mx = b ? (a[0] + b[0]) / 2 : a[0], my = b ? (a[1] + b[1]) / 2 : a[1];
         const p = snap(mx, my, li);
         const lineIdx = p ? p[3] : li[0];
+        // 向き: 線路の向き（前後の点から）を、前の駅 → 次の駅の向きにそろえる
+        let heading = b ? Math.atan2(b[1] - a[1], b[0] - a[0]) : 0;
+        if (p) {
+          const path = p[4].path, q0 = path[Math.max(0, p[5] - 1)], q1 = path[Math.min(path.length - 1, p[5] + 1)];
+          let tx = q1[0] - q0[0], ty = q1[1] - q0[1];
+          if (b && tx * (b[0] - a[0]) + ty * (b[1] - a[1]) < 0) { tx = -tx; ty = -ty; }
+          if (tx || ty) heading = Math.atan2(ty, tx);
+        }
         const rgb = lineIdx !== undefined ? lines[lineIdx].rgb.slice(0, 3) : [220, 220, 220];
         const destId = (t['odpt:destinationStation'] || [])[0];
         next.push({
-          id: t['owl:sameAs'], x: p ? p[0] : mx, y: p ? p[1] : my, z: p ? p[2] : 0, rgb: [...rgb, 255],
+          id: t['owl:sameAs'], x: p ? p[0] : mx, y: p ? p[1] : my, z: p ? p[2] : 0, rgb: [...rgb, 255], yaw: heading * 180 / Math.PI,
           rw: rwTitle, no: t['odpt:trainNumber'], type: TRAIN_TYPE[(t['odpt:trainType'] || '').split('.').pop()] || '',
           dest: destId && odpt.st[destId] ? odpt.st[destId][2] : '', delay: t['odpt:delay'] || 0,
           at: b ? `${a[2]}→${b[2]}` : `${a[2]}に停車中`,

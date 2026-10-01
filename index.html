@@ -289,7 +289,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupmu6xb').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=mupmvnhj').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -319,7 +319,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmu6xb').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmvnhj').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -327,7 +327,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupmu6xb').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=mupmvnhj').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -744,6 +744,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     });
     document.getElementById('loading').remove();
     setNeedle(current.rotationOrbit);
+    restoreSettings();
     window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains };  // 確認用
   }
 
@@ -805,12 +806,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=mupmu6xb').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=mupmvnhj').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=mupmu6xb`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=mupmvnhj`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -829,7 +830,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=mupmu6xb').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=mupmvnhj').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1234,7 +1235,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmu6xb').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmvnhj').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1312,7 +1313,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupmu6xb').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmvnhj').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1370,7 +1371,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const { file } = serviceDay();
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=mupmu6xb`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=mupmvnhj`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1489,6 +1490,41 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     tp.textContent = c ? 'ひらく' : 'たたむ'; tp.setAttribute('aria-expanded', String(!c));
   });
   if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
+
+  // ---- 操作盤の設定を覚える（このブラウザの localStorage。使えないときは覚えないだけ） ----
+  const SAVE_KEY = 'rail3d-settings-v1';
+  const CHECKS = { names: 'showNames', map: 'showMap', trains: 'showTrains', info: 'showInfo', flood: 'showFlood', pax: 'showPax', pw: 'showPw', ubld: 'showUbld', bldg: 'showBldg' };
+  let restoring = false;
+  function saveSettings() {
+    if (restoring) return;
+    const v = { mode: state.mode, kinds: [...state.kinds], exag: state.exag, mapStyle: state.mapStyle };
+    for (const k of Object.keys(CHECKS)) v[k] = !!state[k];
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(v)); } catch (e) { /* 覚えられないときはそのまま */ }
+  }
+  function restoreSettings() {
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { v = null; }
+    if (!v) return;
+    restoring = true;
+    try {
+      // ボタンやチェックを押したのと同じにして、読み込みなども動かす。ビルは入れると倍率を下げるので、倍率はいちばん後で
+      if (v.mode && v.mode !== state.mode) document.getElementById({ all: 'modeAll', under: 'modeUnder', above: 'modeAbove' }[v.mode])?.click();
+      if (Array.isArray(v.kinds)) for (const b of document.querySelectorAll('#chips button')) {
+        const k = KINDS.find((x) => b.textContent.endsWith(x.label));
+        if (k && state.kinds.has(k.key) !== v.kinds.includes(k.key)) b.click();
+      }
+      if (v.mapStyle && v.mapStyle !== state.mapStyle) document.querySelector(`#mapStyle button[data-style="${v.mapStyle}"]`)?.click();
+      for (const [k, id] of Object.entries(CHECKS)) {
+        const el = document.getElementById(id);
+        if (el && typeof v[k] === 'boolean' && el.checked !== v[k]) { el.checked = v[k]; el.dispatchEvent(new Event('change')); }
+      }
+      if (typeof v.exag === 'number' && v.exag !== state.exag) {
+        state.exag = v.exag; exag.value = v.exag; document.getElementById('exagVal').textContent = '×' + v.exag; document.getElementById('bldgHint').hidden = true; redraw();
+      }
+    } finally { restoring = false; }
+  }
+  // 操作盤で何か変えたら覚える（変更の処理が終わってから）
+  for (const ev of ['change', 'click', 'input']) document.getElementById('panel').addEventListener(ev, () => setTimeout(saveSettings, 0));
 
   // 駅名の文字を作る前にフォントの読み込みを待つ（最大 2.5 秒）
   Promise.race([document.fonts ? document.fonts.load('700 14px "Zen Kaku Gothic New"') : Promise.resolve(), new Promise((r) => setTimeout(r, 2500))]).then(start, start);

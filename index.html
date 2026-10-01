@@ -268,7 +268,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupm4lp0').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=mupmc6nf').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -298,7 +298,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupm4lp0').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupmc6nf').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -306,7 +306,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupm4lp0').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=mupmc6nf').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -621,7 +621,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const inf = state.info ? infoByLi.get(o.li) : null;
       html = `<b style="color:${l.color}">■</b> <b>${l.name}</b><br><span class="sub">${l.op || ''}${l.op ? '・' : ''}${where}</span>${inf ? `<br><b style="color:${inf.stop ? '#E5484D' : '#F2B544'}">${inf.status}</b> <span class="sub">${inf.text.slice(0, 80)}${inf.text.length > 80 ? '…' : ''}</span>` : ''}`;
     } else if (info.layer.id.startsWith('trains-body')) {
-      const delay = o.delay >= 60 ? `<b style="color:#F2B544">${Math.round(o.delay / 60)} 分遅れ</b>` : '遅れなし';
+      const delay = o.tt ? '時刻表からの位置（遅れは反映しません）' : o.delay >= 60 ? `<b style="color:#F2B544">${Math.round(o.delay / 60)} 分遅れ</b>` : '遅れなし';
       html = `<b style="color:rgb(${o.rgb.slice(0, 3)})">■</b> <b>${o.rw} ${o.type}</b><br><span class="sub">${o.dest ? o.dest + '行き・' : ''}${o.no}<br>${o.at}・${delay}${o.z < -1 ? `<br>地下 約 ${Math.round(-o.z)}m を走行中` : ''}</span>`;
     } else if (info.layer.id === 'bldg') {
       html = `<b>ビル</b> 高さ 約 ${o.h}m<br><span class="sub">地下鉄でいちばん深い大江戸線（約 32m）の ${(o.h / 32).toFixed(1)} 倍</span>`;
@@ -1010,6 +1010,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       s.cur = [x, y, z]; s.yaw = yaw;
       trains.push({ ...s.info, id: s.id, x, y, z, yaw });
     }
+    ttTick();
+    trains = trains.concat(ttTrains);
     // 列車の層だけ差し替える（ほかの層は作り直さない）
     if (!deckgl) return;
     const fresh = trainsLayers();
@@ -1127,7 +1129,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupm4lp0').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmc6nf').then((r) => r.json()); buildSegGrid(); }
+      await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const seen = new Set();
@@ -1175,7 +1178,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       for (const id of [...trainMap.keys()]) if (!seen.has(id)) trainMap.delete(id);
       tickTrains();
       const now = new Date();
-      trainStatus.textContent = trainMap.size ? `${trainMap.size} 本（${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）。駅のあいだは平均の速さで走らせた目安の位置です。` : '走っている列車が取れませんでした（運転時間外か、中継サーバが止まっています）。';
+      ttTick();
+      trainStatus.textContent = trainMap.size || ttTrains.length
+        ? `実際の位置 ${trainMap.size} 本（都営・横浜市営・JR東日本・東武・京王・京急、${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 更新、30 秒ごと）、時刻表から ${ttTrains.length} 本（東京メトロ・りんかい線・TX・多摩モノレール・相鉄、遅れは反映しません）。駅のあいだの位置は目安です。`
+        : '走っている列車がありません（運転時間外か、中継サーバが止まっています）。';
       trainStatus.hidden = false;
     } catch (e) {
       trainStatus.textContent = '列車の位置を読み込めませんでした。'; trainStatus.hidden = false;
@@ -1189,8 +1195,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       loadTrains();
       trainTimer = setInterval(() => { if (!document.hidden) loadTrains(); }, 30000);
       lastTick = 0;
-      trainTick = setInterval(() => { if (!document.hidden && trainMap.size) tickTrains(); else lastTick = 0; }, 66);
-    } else { trainMap.clear(); trains = []; trainStatus.hidden = true; redraw(); }
+      trainTick = setInterval(() => { if (!document.hidden && (trainMap.size || tt)) tickTrains(); else lastTick = 0; }, 66);
+    } else { trainMap.clear(); trains = []; ttTrains = []; trainStatus.hidden = true; redraw(); }
   }
 
   // ---- 運行情報 ----
@@ -1201,7 +1207,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupm4lp0').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=mupmc6nf').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1239,6 +1245,60 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (state.info) { loadInfo(); infoTimer = setInterval(() => { if (!document.hidden) loadInfo(); }, 60000); }
     else { infoBox.hidden = true; redraw(); }
   });
+
+  // ---- 時刻表から走らせる列車（東京メトロ・りんかい線・TX・多摩モノレール・相鉄。実際の位置が取れない事業者） ----
+  // 駅の発車時刻から、いまどの駅とどの駅のあいだにいるかを計算する。駅では 30 秒止まる目安。遅れは反映しない
+  // 平日／土休日は祝日・年末年始（12/30〜1/3）も見る。深夜 3 時までは前の日のダイヤの続き
+  let tt = null, ttFile = '', ttTrains = [];
+  const ttPaths = new Map();
+  const jstNow = () => new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
+  function serviceDay() {
+    const n = jstNow(), d = new Date(n);
+    if (n.getHours() < 3) d.setDate(d.getDate() - 1);
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const md = ymd.slice(4);
+    const holiday = d.getDay() === 0 || d.getDay() === 6 || (odpt.hol || []).includes(ymd) || md >= '1230' || md <= '0103';
+    const minutes = (n - d.setHours(0, 0, 0, 0)) / 60000;
+    return { file: holiday ? 'tt-holiday' : 'tt-weekday', minutes };
+  }
+  async function loadTimetable() {
+    const { file } = serviceDay();
+    if (file === ttFile) return;
+    ttFile = file;
+    tt = await fetch(`${file}.json?v=mupmc6nf`).then((r) => r.json()).catch(() => null);
+  }
+  const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
+  function ttTick() {
+    ttTrains = [];
+    if (!tt || !odpt) return;
+    const now = serviceDay().minutes;
+    for (const row of tt.trains) {
+      const n = (row.length - 4) / 2, t0 = row[5], tn = row[4 + 2 * n - 1];
+      if (now < t0 || now >= tn) continue;
+      let k = 1;
+      while (k < n - 1 && row[5 + 2 * k] <= now) k++;
+      // 駅 k-1 を出て駅 k に向かう（駅 k に着くのは発車の 30 秒前。終点は着いた時刻）
+      const ta = row[5 + 2 * (k - 1)], tb = k === n - 1 ? row[5 + 2 * k] : row[5 + 2 * k] - 0.5;
+      const A = tt.st[row[4 + 2 * (k - 1)]], B = tt.st[row[4 + 2 * k]];
+      const rwId = tt.rw[row[0]], r = odpt.rw[rwId] || ['', []], li = r[1];
+      const key = A + '|' + B;
+      if (!ttPaths.has(key)) {
+        const a = odpt.st[A], b = odpt.st[B];
+        if (!a || !b) continue;
+        ttPaths.set(key, withCum(trackPath(a, b, li)));
+      }
+      const path = ttPaths.get(key);
+      const f = Math.min(1, Math.max(0, (now - ta) / Math.max(0.1, tb - ta)));
+      const [x, y, z, yaw] = pathAt(path, f * path.len, 0);
+      const lineIdx = li[0];
+      const rgb = lineIdx !== undefined ? lines[lineIdx].rgb.slice(0, 3) : [220, 220, 220];
+      const dest = row[2] >= 0 ? (odpt.st[tt.st[row[2]]] || [])[2] : '';
+      ttTrains.push({
+        id: 'tt:' + rwId + row[3], x, y, z, yaw, li: lineIdx, rgb: [...rgb, 255], tt: true, rw: r[0], no: row[3],
+        type: TT_TYPE[tt.type[row[1]]] || '', dest: dest || '', delay: 0, at: f >= 1 ? `${odpt.st[B][2]}に停車中` : `${odpt.st[A][2]}→${odpt.st[B][2]}`,
+      });
+    }
+  }
 
   // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----
   function fly(v, ms) {

@@ -245,7 +245,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=mupldy65').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muplkzod').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=mupldy65').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muplkzod').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -283,7 +283,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=mupldy65').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muplkzod').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -889,8 +889,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   //  - 駅のあいだ: 平均の速さ（地下鉄 12m/秒、ほか 17m/秒）で次の駅へ。着いたと分かるまでは手前（97%）で待つ
   //  - 駅に着いた: いまの位置から数秒で駅に寄せて止める
   //  - 初めて見る列車: 駅のあいだなら真ん中から、停車中なら駅から
+  //  - 停車中のまま DWELL 秒たったら、進む向きの次の駅へ走り出す（東武などは 1 分ごとの更新で、駅を出たあとも
+  //    しばらく「停車中」のままなので、各駅で止まって見えてしまう）。あとで次の駅へ向かうデータが来たらそのまま続ける
   // 駅のあいだの線路の形は、区間が変わったときに 1 回だけ求めておき、毎回はその上を進めるだけにする
   const trainMap = new Map();
+  const DWELL = 20;
+  // 進む向きの次の駅（環状線は一周つなぐ）。分からなければ null
+  function nextStation(rwId, from, dir) {
+    const r = odpt.rw[rwId];
+    if (!r || !r[2] || !dir) return null;
+    let order = r[2];
+    const loop = order.length > 2 && order[0] === order[order.length - 1];
+    if (loop) order = order.slice(0, -1);
+    const i = order.indexOf(from);
+    if (i < 0) return null;
+    const j = i + (dir.replace('odpt.RailDirection:', '') === r[3] ? 1 : -1);
+    if (loop) return order[(j + order.length) % order.length];
+    return order[j] || null;
+  }
   let trainTick = 0, lastTick = 0;
   const withCum = (pts) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1] }; };
   function trackPath(a, b, li) {
@@ -925,6 +941,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     lastTick = now;
     trains = [];
     for (const s of trainMap.values()) {
+      if (!s.toNext && s.next && (now - s.stopSince) / 1000 > DWELL) {
+        // 停車中のまま時間がたった列車を、次の駅へ走らせる
+        const pts = trackPath(s.stopAt, odpt.st[s.next], s.li);
+        s.path = withCum([s.cur, ...pts]); s.sm = 0; s.speed = s.baseSpeed; s.toNext = true; s.headingTo = s.next; s.next = null;
+      }
       const limit = s.toNext ? s.path.len * 0.97 : s.path.len;
       s.sm = Math.min(limit, s.sm + s.speed * dt);
       const [x, y, z, yaw] = pathAt(s.path, s.sm, s.yaw);
@@ -1040,7 +1061,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=mupldy65').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muplkzod').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const seen = new Set();
@@ -1064,6 +1085,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         const key = t['odpt:fromStation'] + '>' + (t['odpt:toStation'] || '');
         if (s.key === key) continue; // 同じ区間ならそのまま走らせ続ける
         s.key = key;
+        s.li = li; s.baseSpeed = subway ? 12 : 17;
+        // 先に走らせていた向かう先と同じ区間のデータが来たら、そのまま走らせ続ける
+        if (b && s.toNext && s.headingTo === t['odpt:toStation']) continue;
+        s.headingTo = t['odpt:toStation'] || null;
         const near = (pts) => prev && Math.hypot(prev[0] - pts[0][0], prev[1] - pts[0][1]) < 3000;
         if (b) {
           // 駅のあいだ: いまの位置から次の駅まで（初めて見る列車は真ん中から）
@@ -1077,6 +1102,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
           if (near([st])) { s.path = withCum([prev, st]); s.sm = 0; s.speed = Math.max(subway ? 12 : 17, s.path.len / 4); }
           else { s.path = withCum([st]); s.sm = 0; s.speed = 0; }
           s.toNext = false;
+          s.stopAt = a; s.stopSince = performance.now(); s.next = nextStation(t['odpt:railway'], t['odpt:fromStation'], t['odpt:railDirection']);
+          if (s.next && !odpt.st[s.next]) s.next = null;
         }
       }
       for (const id of [...trainMap.keys()]) if (!seen.has(id)) trainMap.delete(id);

@@ -355,7 +355,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqami90').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqassnl').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -385,7 +385,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqami90').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqassnl').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -393,7 +393,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqami90').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqassnl').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -1013,12 +1013,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqami90').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqassnl').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqami90`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqassnl`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1037,7 +1037,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqami90').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqassnl').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1448,7 +1448,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqami90').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqassnl').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1529,7 +1529,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqami90').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqassnl').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1596,7 +1596,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqami90`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqassnl`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1819,15 +1819,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     orbitRaf = requestAnimationFrame(step);
   }
   const at = (lon, lat, zoom, orbit, tilt) => ({ target: fromLonLat(lon, lat), zoom, rotationOrbit: orbit, rotationX: tilt });
-  // on: その場面で入れる表示（ほかは切る）。ring: 輪で示す駅。line: 目立たせる路線
+  // on: その場面で入れる表示（ほかは切る）。ring: 輪で示す駅。line: 目立たせる路線。exag: 深さの倍率（強調しすぎると分かりにくいので、ふだんの ×45 より控えめ。既定 ×12）
   const TOUR = [
     { cap: '日本の鉄道立体図', sub: '全国の鉄道を、地上・高架・地下まで立体で見られます。これから見どころを順に案内します（下のボタンで前後・一時停止）。', fit: true },
     { cap: '東京駅の地下', sub: '地図（地面）より下に伸びる線が、地下を走る路線です。東京駅の地下には何本もの路線が重なっています。', view: at(139.7671, 35.6812, -1.6, -35, 34), ring: '東京' },
     { cap: 'いま走っている列車', sub: '線路の上の小さな車両が列車です。地下の列車は細い縦線で地面とつながっています（ODPT の位置と時刻表から）。', on: ['showTrains'], view: at(139.745, 35.685, -2.2, -25, 32), ring: '東京' },
     { cap: '大江戸線を列車の目線で', sub: '地下 30m 台を走る、いちばん深い地下鉄の中を進みます。', on: ['showTrains'], fly: '都営大江戸線', hold: 15000 },
-    { cap: '六本木駅の中', sub: '地上から地下 7 階のホームまで。水色の線がエレベーター、オレンジが階段、黄色がエスカレーターです。', on: ['showPw'], view: at(139.7313, 35.6641, 0.2, -30, 30), ring: '六本木' },
-    { cap: '都庁と都庁前駅', sub: '白い柱がビルです。高さ 243m の都庁と、地下の大江戸線を同じ倍率で比べると、地下鉄は意外と浅く見えます。', on: ['showBldg'], view: at(139.6917, 35.6896, -1.0, -30, 18), ring: '都庁前', line: '都営大江戸線' },
-    { cap: '新宿の地下街', sub: 'オレンジ色の面が地下街の床です。駅の東口と西口に広がっています（PLATEAU 地下街モデル）。', on: ['showUbld'], view: at(139.7005, 35.6905, -0.2, -30, 36), ring: '新宿' },
+    { cap: '六本木駅の中', sub: '地上から地下 7 階のホームまで。水色の線がエレベーター、オレンジが階段、黄色がエスカレーターです。', on: ['showPw'], view: at(139.7313, 35.6641, 0.2, -30, 30), ring: '六本木', exag: 6 },
+    { cap: '都庁と都庁前駅', sub: '白い柱がビルです。高さ 243m の都庁と、地下の大江戸線を同じ倍率で比べると、地下鉄は意外と浅く見えます。', on: ['showBldg'], view: at(139.6917, 35.6896, -1.0, -30, 18), ring: '都庁前', line: '都営大江戸線', exag: 2 },
+    { cap: '新宿の地下街', sub: 'オレンジ色の面が地下街の床です。駅の東口と西口に広がっています（PLATEAU 地下街モデル）。', on: ['showUbld'], view: at(139.7005, 35.6905, -0.2, -30, 36), ring: '新宿', exag: 8 },
     { cap: '北千住と浸水想定', sub: '赤っぽい色の区域が、川があふれたときに 5〜10m 浸かる想定の場所。駅の上の円柱が水の高さです。', on: ['showFlood'], view: at(139.8045, 35.7495, -1.6, -25, 28), ring: '北千住' },
     { cap: '駅の利用者数', sub: '柱が高いほど、1 日に乗り降りする人が多い駅です。渋谷・新宿・池袋がとびぬけています。', on: ['showPax'], view: at(139.73, 35.69, -3.0, -20, 36), ring: '新宿' },
     { cap: '大阪・梅田', sub: '東京だけでなく全国どこでも。梅田の地下には御堂筋線・四つ橋線・谷町線が通ります。', view: at(135.4985, 34.7020, -1.6, -20, 30), ring: '梅田' },
@@ -1862,8 +1862,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (flying) stopFly();
     tourIdx = i;
     const st = TOUR[i];
-    // その場面の表示だけを入れる
+    // その場面の表示だけを入れる。倍率はそのあとで（ビルを入れると倍率が ×2 に下がるため）
     for (const id of LAYER_CHECKS) setCheck(id, (st.on || []).includes(id));
+    const ex = st.exag || 12;
+    state.exag = ex; exag.value = ex; document.getElementById('exagVal').textContent = '×' + ex; document.getElementById('bldgHint').hidden = true;
     // 注目する路線と駅
     const li = st.line || st.fly ? lines.findIndex((l) => l.name === (st.line || st.fly)) : -1;
     pick(li >= 0 ? li : null);
@@ -1879,8 +1881,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     touring = true; tourPaused = false; tourSaved = currentSettings();
     tourBtn.textContent = '■ ツアーを止める';
     if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
-    // 見やすい初期状態（すべての区間・すべての種類・×45・暗い地図。明るい地図だと線や柱が見づらい）
-    applySettings({ mode: 'all', kinds: KINDS.map((k) => k.key), exag: 45, mapStyle: 'dark', names: true, map: true, trains: false, info: false, flood: false, pax: false, pw: false, ubld: false, bldg: false, simple: state.simple });
+    // 見やすい初期状態（すべての区間・すべての種類・×12・暗い地図。明るい地図だと線や柱が見づらい）
+    applySettings({ mode: 'all', kinds: KINDS.map((k) => k.key), exag: 12, mapStyle: 'dark', names: true, map: true, trains: false, info: false, flood: false, pax: false, pw: false, ubld: false, bldg: false, simple: state.simple });
     goStep(0);
   }
   function endTour() {

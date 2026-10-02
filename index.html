@@ -457,7 +457,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqu0tn0').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muquzce7').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -487,7 +487,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqu0tn0').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muquzce7').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -495,7 +495,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqu0tn0').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muquzce7').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -553,6 +553,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const visibleSeg = (s) => {
     const l = lines[s.li];
     if (!state.kinds.has(l.kind)) return false;
+    // 選んだ路線は、表示する区間に関係なく全部出す（「ここなら見える」で地上・高架だけにしているとき、地下鉄を選ぶと何も出なかった）
+    if (state.picked !== null && s.li === state.picked) return true;
     if (state.mode === 'under') return s.under;
     if (state.mode === 'above') return !s.under;
     return true;
@@ -718,14 +720,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const mm = modelMatrix();
     const kindKey = state.mode + '|' + [...state.kinds].sort().join(',');
     const stKey = kindKey + '|' + state.picked;
-    const under = cached('under', kindKey, () => segs.filter((s) => s.under && visibleSeg(s)));
-    const above = cached('above', kindKey, () => segs.filter((s) => !s.under && visibleSeg(s)));
+    const under = cached('under', stKey, () => segs.filter((s) => s.under && visibleSeg(s)));
+    const above = cached('above', stKey, () => segs.filter((s) => !s.under && visibleSeg(s)));
     const pickedTrig = [state.picked];
     const showStation = (s) => {
       if (!s.lines.some((li) => state.kinds.has(lines[li].kind))) return false;
+      // 路線を選んでいるときは、その路線の駅を表示する区間に関係なく全部
+      if (state.picked !== null) return s.lines.includes(state.picked);
       if (state.mode === 'under' && s.zmin >= 0) return false;
       if (state.mode === 'above' && s.lines.every((li) => lines[li].kind === 'subway')) return false;
-      if (state.picked !== null) return s.lines.includes(state.picked);
       return true;
     };
     const st = cached('st', stKey, () => stations.filter(showStation));
@@ -798,7 +801,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       ...allBL,
       // 運行情報のある路線を太い帯で（見合わせ・運休は赤、ほかは琥珀色）
       new deck.PathLayer({
-        id: 'info', data: state.info ? cached('info', kindKey + '|' + infoStamp, () => segs.filter((s) => infoByLi.has(s.li) && visibleSeg(s))) : [], getPath: segPath,
+        id: 'info', data: state.info ? cached('info', stKey + '|' + infoStamp, () => segs.filter((s) => infoByLi.has(s.li) && visibleSeg(s))) : [], getPath: segPath,
         getColor: (d) => (infoByLi.get(d.li).stop ? [229, 72, 77, 150] : [242, 181, 68, 140]), updateTriggers: { getColor: [infoStamp], getPath: [hr()] },
         widthUnits: 'pixels', getWidth: 11, ...pathStyle(), modelMatrix: mm, parameters: { depthWriteEnabled: false },
       }),
@@ -1157,12 +1160,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqu0tn0').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muquzce7').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqu0tn0`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muquzce7`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1184,7 +1187,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqu0tn0').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muquzce7').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1641,9 +1644,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     // 種類のボタン・表示する区間・選んだ路線に合わせる（線路と同じ）
     const showTrain = (d) => {
       if (d.li !== undefined && !state.kinds.has(lines[d.li].kind)) return false;
+      // 選んだ路線の列車は、表示する区間に関係なく出す
+      if (state.picked !== null) return d.li === state.picked;
       if (state.mode === 'under' && d.z >= -1) return false;
       if (state.mode === 'above' && d.z < -1) return false;
-      if (state.picked !== null && d.li !== state.picked) return false;
       return true;
     };
     const data = state.trains ? trains.filter(showTrain) : [];
@@ -1704,7 +1708,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqu0tn0').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muquzce7').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1785,7 +1789,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqu0tn0').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muquzce7').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1852,7 +1856,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqu0tn0`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muquzce7`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2165,8 +2169,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqu0tn0').then((r) => r.json()),
-    fetch('far.json?v=muqu0tn0').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muquzce7').then((r) => r.json()),
+    fetch('far.json?v=muquzce7').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => {
     views = v; far = f;
     if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]);
@@ -2204,7 +2208,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqu0tn0`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muquzce7`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2566,7 +2570,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqu0tn0`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=muquzce7`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -2793,7 +2797,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqu0tn0`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=muquzce7`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

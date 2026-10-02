@@ -433,7 +433,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqhrfxx').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqi4j6a').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -463,7 +463,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqhrfxx').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqi4j6a').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -471,7 +471,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqhrfxx').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqi4j6a').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -1125,12 +1125,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqhrfxx').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqi4j6a').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqhrfxx`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqi4j6a`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1150,7 +1150,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqhrfxx').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqi4j6a').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1670,7 +1670,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqhrfxx').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqi4j6a').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1751,7 +1751,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqhrfxx').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqi4j6a').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1818,7 +1818,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqhrfxx`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqi4j6a`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2098,7 +2098,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     st: { ch: 1, pal: [[0, 0, 0, 0], [150, 120, 255, 165], [70, 150, 255, 185], [80, 230, 255, 215]] },
     fj: { ch: 2, pal: [[0, 0, 0, 0], [242, 220, 90, 185], [100, 230, 130, 215]] },
   };
-  const loadViews = () => viewsLoading || (viewsLoading = fetch('views.json?v=muqhrfxx').then((r) => r.json()).then((v) => { views = v; return v; }));
+  const loadViews = () => viewsLoading || (viewsLoading = fetch('views.json?v=muqi4j6a').then((r) => r.json()).then((v) => { views = v; return v; }));
   const seeTiles = new Map();
   let seeRedrawTimer = 0;
   // タイルを読み、画素の値をとっておく（色を付けるのは選んだものに合わせてあとで）
@@ -2107,7 +2107,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {} };
-      t.ready = fetch(`view/${id}.png?v=muqhrfxx`).then((r) => r.blob())
+      t.ready = fetch(`view/${id}.png?v=muqi4j6a`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2338,19 +2338,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     return out;
   }
+  // 届いたタイルは 1 枚ずつ、間をあけて立体にする（1 枚 2,000〜3,000 棟で 0.2〜0.5 秒かかり、まとめると画面が固まるため）
+  const allBQueue = [];
+  let allBTimer = 0;
+  function allBNext() {
+    if (allBTimer || !allBQueue.length) return;
+    const [k, x, y, arr] = allBQueue.shift();
+    allB.set(k, decodeB(x, y, arr));
+    redraw();
+    allBTimer = setTimeout(() => { allBTimer = 0; allBNext(); }, 350);
+  }
   const allBColor = (d) => { const t = Math.min(1, d.h / 60) ** 0.7; return [Math.round(72 + 90 * t), Math.round(82 + 90 * t), Math.round(100 + 90 * t), 255]; };
   function allBldgLayers() {
     allBKey = '';
-    if (!state.see || !views || !views.bk || current.zoom < -1.3) return [];
+    // 一度に多く立体にすると固まるので、寄ったとき（拡大率 0.2 以上）だけ、画面の中心に近い 9 枚（約 3km 四方）まで
+    if (!state.see || !views || !views.bk || current.zoom < 0.2) return [];
     if (!bkSet) bkSet = new Set(views.bk);
-    const ts = tilesFor((z, x, y) => ({ x, y }), 15, 15).filter((t) => bkSet.has(t.url.x + '/' + t.url.y));
+    const [cx, cy] = current.target, dc = (t) => { const b = t.bounds; return ((b[0][0] + b[2][0]) / 2 - cx) ** 2 + ((b[0][1] + b[1][1]) / 2 - cy) ** 2; };
+    const ts = tilesFor((z, x, y) => ({ x, y }), 15, 15).filter((t) => bkSet.has(t.url.x + '/' + t.url.y)).sort((a, b) => dc(a) - dc(b)).slice(0, 9);
     allBKey = ts.map((t) => t.id).join(',');
     const out = [];
     for (const t of ts) {
       const k = t.url.x + '/' + t.url.y;
       if (!allB.has(k)) {
         allB.set(k, null);
-        fetch(`view/b/${k}.json?v=muqhrfxx`).then((r) => r.json()).then((arr) => { allB.set(k, decodeB(t.url.x, t.url.y, arr)); redraw(); }).catch(() => allB.delete(k));
+        fetch(`view/b/${k}.json?v=muqi4j6a`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
       }
       const data = allB.get(k);
       if (data) out.push(new deck.SolidPolygonLayer({
@@ -2433,6 +2445,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       ol.appendChild(li);
     }
   }
+  // 富士山: 東京の湾岸から富士山の方を向き、低めの角度で（手前に見える場所の色、地平線に富士山）
+  function fujiView() {
+    const a = fromLonLat(139.775, 35.655), f = fromLonLat(views.fj.at[0], views.fj.at[1]);
+    fly({ target: a, zoom: -1.3, rotationOrbit: Math.atan2(f[0] - a[0], f[1] - a[1]) * 180 / Math.PI, rotationX: 6 }, 1600);
+  }
   const SEE_VIEW = { fw: [139.800, 35.708, -0.9], st: [139.810, 35.712, -1.6], fj: [139.77, 35.66, -2.6] };
   // 入れる前の 高さの強調・表示する区間・地図（「なし」に戻したら元に戻す）
   let seePrev = null;
@@ -2461,8 +2478,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       await loadViews();
       if (state.see !== kind) return;
       seePanel();
-      if (kind === 'fw') fwTimer = setInterval(fwTick, 60);
-      if (moveTo) { const [lo, la, z] = SEE_VIEW[kind]; fly({ target: fromLonLat(lo, la), zoom: z, rotationX: 38 }, 1400); }
+      if (kind === 'fw') fwTimer = setInterval(fwTick, 80);
+      if (moveTo && kind === 'fj') fujiView();
+      else if (moveTo) { const [lo, la, z] = SEE_VIEW[kind]; fly({ target: fromLonLat(lo, la), zoom: z, rotationX: 38 }, 1400); }
     }
     saveSettings();
     redraw();
@@ -2504,7 +2522,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { cap: '駅の利用者数', sub: '柱が高いほど、1 日に乗り降りする人が多い駅です。渋谷・新宿・池袋がとびぬけています。', on: ['showPax'], view: at(139.73, 35.69, -3.0, -20, 36), ring: '新宿' },
     { cap: 'ここなら花火が見える', sub: '東京23区の約 190 万棟の建物の高さから、地上で隅田川の花火が見える場所を計算しました。ピンクは低めの花火から、オレンジは大きな花火なら見える場所。会場から離れた両国駅の近くの通りからも見えます（緑の線が見通し）。', see: 'fw', seeFrom: '両国', view: at(139.7963, 35.700, -0.1, -28, 42), exag: 12, exagH: 1, mode: 'above', hold: 13000 },
     { cap: 'スカイツリーが見える場所', sub: '荒川・隅田川の土手や、スカイツリーへまっすぐ向かう通りから見えます。水色ほど、塔の下の方まで見えます。', see: 'st', view: at(139.812, 35.713, -1.7, -20, 30), exagH: 1, mode: 'above' },
-    { cap: '富士山が見える場所', sub: '空気が澄んだ日に、建物にさえぎられずに富士山が見える場所。荒川の土手や湾岸、西南西へまっすぐ延びる通りです（緑の線が富士山の方向）。', see: 'fj', seeFrom: '台場', view: at(139.776, 35.626, -0.9, -60, 38), exagH: 1, mode: 'above', hold: 12000 },
+    { cap: '富士山が見える場所', sub: '湾岸から西南西を見ると、地平線の上に富士山（約 100km 先）。手前の色は、空気が澄んだ日に建物にさえぎられずに富士山が見える場所です。荒川の土手や湾岸、富士山の方へまっすぐ延びる通りから見えます。', see: 'fj', fujiView: true, exagH: 1, mode: 'above', hold: 12000 },
     { cap: '大阪・梅田', sub: '東京だけでなく全国どこでも。梅田の地下には御堂筋線・四つ橋線・谷町線が通ります。', view: at(135.4985, 34.7020, -1.6, -20, 30), ring: '梅田' },
     { cap: '日本の鉄道立体図', sub: '左のメニューから、見どころ・列車・重ねる情報を自由に選べます。https://tyra0119.github.io/pj_map/', fit: true },
   ];
@@ -2542,7 +2560,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     clearTimeout(tourTimer);
     if (tourPaused) return;
     const hold = st.hold || 10000;
-    if (!st.fit && !st.fly) setTimeout(() => { if (touring && !tourPaused && TOUR[tourIdx] === st) slowOrbit(20, hold - 2400); }, 2400);
+    // 富士山の場面は回すと富士山が画面から外れるので回さない
+    if (!st.fit && !st.fly && !st.fujiView) setTimeout(() => { if (touring && !tourPaused && TOUR[tourIdx] === st) slowOrbit(20, hold - 2400); }, 2400);
     tourTimer = setTimeout(() => goStep(tourIdx + 1), hold);
   }
   function goStep(i) {
@@ -2570,6 +2589,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     showCard(st.card ? stationBy(st.card) : null);
     renderCaption();
     if (st.fit) document.getElementById('fitAll').click();
+    else if (st.fujiView) loadViews().then(() => { if (touring && TOUR[tourIdx] === st) fujiView(); });
     else if (st.view && !st.seeFrom) fly(st.view, 2200);
     else redraw();
     if (st.fly && li >= 0) flyLine(li);

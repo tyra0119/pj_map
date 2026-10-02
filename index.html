@@ -26,6 +26,20 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--fo
 .landlabels span { position: absolute; transform: translate(-50%, -100%); padding-bottom: 6px; font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap;
   text-shadow: 0 0 3px #0A0F15, 0 0 3px #0A0F15, 0 0 6px #0A0F15; }
 
+/* 操作盤は白基調（地図の上に浮かぶカード・ボタン・字幕は地図になじむ暗い色のまま）。パネルの中だけ色の変数を入れ替える */
+.panel {
+  --panel: rgba(250, 251, 253, 0.97);
+  --line: #D3DAE4;
+  --fg: #18212C;
+  --muted: #5A6677;
+  --accent: #9A6200;        /* 白の上で読める琥珀色（文字・枠） */
+  --soft: rgba(20, 40, 70, 0.045);
+  --tabs-bg: #E8EDF3; --tabs-line: #C7D0DC; --tabs-fg: #3A4656; --tabs-hover: rgba(20, 40, 70, 0.07);
+  --qlist-bg: #FFFFFF;
+  --profile-under: #E4EAF1;
+  color: var(--fg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
 .panel {
   position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 300px; max-height: calc(100% - 24px);
   overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -91,7 +105,7 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 }
 .clockbtns select { background: var(--panel); }
 .clockbtns button[aria-pressed="true"] { background: var(--lamp); color: #1A1204; font-weight: 700; }
-.tourbtn { padding: 8px 10px; font-weight: 700; border-color: var(--lamp); color: var(--lamp); }
+.tourbtn { padding: 8px 10px; font-weight: 700; border-color: var(--lamp); color: var(--accent, var(--lamp)); }
 .tourbtn:hover, .clockbtns button:hover { background-color: rgba(242, 181, 68, 0.12); }
 .profile svg { display: block; width: 100%; height: auto; margin-top: 4px; }
 .profile text { font-family: var(--font-body); }
@@ -109,10 +123,10 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .caption[hidden] { display: none; }
 @media (max-width: 640px) { .caption { font-size: 16px; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); } .caption .tcap { font-size: 17px; } .caption small { font-size: 13px; } }
 .tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin: 0 -6px; padding: 4px;
-  background: #1A2533; border: 1px solid #33445B; border-radius: 9px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
-.tabs button { font: inherit; font-size: 13px; color: #C3CCD8; background: transparent; border: 0; border-radius: 6px; padding: 7px 2px; cursor: pointer; }
+  background: var(--tabs-bg, #1A2533); border: 1px solid var(--tabs-line, #33445B); border-radius: 9px; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); }
+.tabs button { font: inherit; font-size: 13px; color: var(--tabs-fg, #C3CCD8); background: transparent; border: 0; border-radius: 6px; padding: 7px 2px; cursor: pointer; }
 .tabs button[aria-selected="true"] { color: #1A1204; background: var(--lamp); font-weight: 700; }
-.tabs button:hover { color: var(--fg); background: rgba(255, 255, 255, 0.08); }
+.tabs button:hover { color: var(--fg); background: var(--tabs-hover, rgba(255, 255, 255, 0.08)); }
 .tabs button[aria-selected="true"]:hover { color: #1A1204; background: var(--lamp); }
 .tabs button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 .pane { display: grid; gap: 14px; }
@@ -122,7 +136,7 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .about summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
 .about[open] summary { margin-bottom: 8px; }
 .about .note { border-top: 0; padding-top: 6px; }
-.card { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; display: grid; gap: 6px; background: rgba(255, 255, 255, 0.03); }
+.card { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; display: grid; gap: 6px; background: var(--soft, rgba(255, 255, 255, 0.03)); }
 .card[hidden] { display: none; }
 .card .ctitle { display: flex; align-items: center; gap: 8px; }
 .card .ctitle b { font-size: 15px; }
@@ -135,7 +149,7 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .badge.hi { background: #D9363E; } .badge.mid { background: #D98A1A; } .badge.lo { background: #6B7686; }
 .widebtn { font: inherit; font-size: 12.5px; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; cursor: pointer; text-align: left; }
 .widebtn:hover { background-color: rgba(242, 181, 68, 0.12); }
-.widebtn[aria-pressed="true"] { color: var(--lamp); border-color: var(--lamp); background-color: rgba(242, 181, 68, 0.1); }
+.widebtn[aria-pressed="true"] { color: var(--accent, var(--lamp)); border-color: var(--lamp); background-color: rgba(242, 181, 68, 0.14); font-weight: 700; }
 .flood { display: grid; gap: 8px; }
 .flood[hidden] { display: none; }
 .legend { display: grid; grid-template-columns: repeat(3, auto); gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
@@ -143,7 +157,7 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .legend i { width: 12px; height: 10px; border-radius: 2px; display: inline-block; }
 .rank { margin: 0; padding: 0 0 0 1.6em; display: grid; gap: 2px; font-size: 12.5px; max-height: 190px; overflow-y: auto; }
 .rank li { cursor: pointer; line-height: 1.5; }
-.rank li:hover { color: var(--lamp); }
+.rank li:hover { color: var(--accent, var(--lamp)); }
 .rank .sub { color: var(--muted); font-size: 11.5px; }
 .seebox { display: grid; gap: 6px; margin-top: 6px; }
 .seebox[hidden] { display: none; }
@@ -169,14 +183,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 
 .search { position: relative; }
 .search input {
-  font: inherit; font-size: 14px; color: var(--fg); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line);
+  font: inherit; font-size: 14px; color: var(--fg); background: var(--qlist-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--line);
   border-radius: 7px; padding: 8px 10px; width: 100%; box-sizing: border-box;
 }
 .search input::placeholder { color: var(--muted); }
 .search input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 .qlist {
   list-style: none; margin: 4px 0 0; padding: 4px; position: absolute; left: 0; right: 0; top: 100%; z-index: 6;
-  background: #0E141C; border: 1px solid var(--line); border-radius: 8px; max-height: 280px; overflow-y: auto;
+  background: var(--qlist-bg, #0E141C); border: 1px solid var(--line); border-radius: 8px; max-height: 280px; overflow-y: auto; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 .qlist[hidden] { display: none; }
 .qlist li { padding: 6px 8px; border-radius: 5px; cursor: pointer; display: grid; gap: 1px; }
@@ -189,11 +203,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 .picked .name { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
 .picked .name i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
 .picked p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
-.picked button { justify-self: start; font: inherit; font-size: 12px; color: var(--lamp); background: none; border: 0; padding: 2px 0; cursor: pointer; }
+.picked button { justify-self: start; font: inherit; font-size: 12px; color: var(--accent, var(--lamp)); background: none; border: 0; padding: 2px 0; cursor: pointer; }
 /* 選択を外すボタン: 路線名の横と、いちばん下（見つけやすいように枠つきで） */
-.picked .pclose { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--fg); background: rgba(255, 255, 255, 0.08); border: 1px solid #3A4B62; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.picked .pclose { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--fg); background: var(--soft, rgba(255, 255, 255, 0.08)); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
 .picked .pclose:hover, .picked .pclear:hover { background: rgba(242, 181, 68, 0.15); border-color: var(--lamp); }
-.picked .pclear { justify-self: stretch; margin-top: 6px; font-size: 13px; color: var(--fg); background: rgba(255, 255, 255, 0.05); border: 1px solid #3A4B62; border-radius: 7px; padding: 7px; text-align: center; }
+.picked .pclear { justify-self: stretch; margin-top: 6px; font-size: 13px; color: var(--fg); background: var(--soft, rgba(255, 255, 255, 0.05)); border: 1px solid var(--line); border-radius: 7px; padding: 7px; text-align: center; }
 
 /* 断面の目安図（地面からの深さ） */
 .gauge { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
@@ -465,7 +479,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqvh6fm').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqx2bci').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -495,7 +509,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqvh6fm').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqx2bci').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -503,7 +517,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqvh6fm').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqx2bci').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -937,19 +951,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const labels = [], ticks = [];
     for (const { s, d } of sts) {
       const x = X(d);
-      ticks.push(`<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${(Y(0) - 3).toFixed(1)}" y2="${(Y(0) + 3).toFixed(1)}" stroke="#8E9AAB"><title>${s.name}</title></line>`);
-      if (x - lastX > 26) { labels.push(`<text x="${x.toFixed(1)}" y="${T - 4}" font-size="9" fill="#C8D0DB" transform="rotate(-35 ${x.toFixed(1)} ${T - 4})">${s.name}</text>`); lastX = x; }
+      ticks.push(`<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${(Y(0) - 3).toFixed(1)}" y2="${(Y(0) + 3).toFixed(1)}" style="stroke:var(--muted)"><title>${s.name}</title></line>`);
+      if (x - lastX > 26) { labels.push(`<text x="${x.toFixed(1)}" y="${T - 4}" font-size="9" style="fill:var(--fg)" transform="rotate(-35 ${x.toFixed(1)} ${T - 4})">${s.name}</text>`); lastX = x; }
     }
-    const yt = [zmax, 0, zmin].filter((v, i, a) => a.indexOf(v) === i).map((z) => `<text x="${L - 4}" y="${(Y(z) + 3).toFixed(1)}" font-size="9" fill="#8E9AAB" text-anchor="end">${z}m</text>`).join('');
+    const yt = [zmax, 0, zmin].filter((v, i, a) => a.indexOf(v) === i).map((z) => `<text x="${L - 4}" y="${(Y(z) + 3).toFixed(1)}" font-size="9" style="fill:var(--muted)" text-anchor="end">${z}m</text>`).join('');
     box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${lines[li].name}の縦の断面図（横は距離、縦は地面からの高さ）">
-      <rect x="${L}" y="${Y(0).toFixed(1)}" width="${W - L - R}" height="${(H - B - Y(0)).toFixed(1)}" fill="#1A2430"/>
+      <rect x="${L}" y="${Y(0).toFixed(1)}" width="${W - L - R}" height="${(H - B - Y(0)).toFixed(1)}" style="fill:var(--profile-under, #1A2430)"/>
       <path d="${area}" fill="${c}" fill-opacity="0.22"/>
-      <line x1="${L}" x2="${W - R}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#6B7686" stroke-dasharray="3 3"/>
+      <line x1="${L}" x2="${W - R}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" style="stroke:var(--muted)" stroke-dasharray="3 3"/>
       <path d="${line}" fill="none" stroke="${c}" stroke-width="2"/>
       ${ticks.join('')}${labels.join('')}${yt}
-      <text x="${L}" y="${H - 4}" font-size="9" fill="#8E9AAB">0</text>
-      <text x="${W - R}" y="${H - 4}" font-size="9" fill="#8E9AAB" text-anchor="end">${(total / 1000).toFixed(1)}km</text>
-      <text x="${(L + W - R) / 2}" y="${H - 4}" font-size="9" fill="#8E9AAB" text-anchor="middle">地面（点線）から上が高架、下が地下</text>
+      <text x="${L}" y="${H - 4}" font-size="9" style="fill:var(--muted)">0</text>
+      <text x="${W - R}" y="${H - 4}" font-size="9" style="fill:var(--muted)" text-anchor="end">${(total / 1000).toFixed(1)}km</text>
+      <text x="${(L + W - R) / 2}" y="${H - 4}" font-size="9" style="fill:var(--muted)" text-anchor="middle">地面（点線）から上が高架、下が地下</text>
     </svg>`;
   }
 
@@ -1168,12 +1182,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqvh6fm').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqx2bci').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqvh6fm`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqx2bci`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1195,7 +1209,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqvh6fm').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqx2bci').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1716,7 +1730,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqvh6fm').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqx2bci').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1797,7 +1811,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqvh6fm').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqx2bci').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1864,7 +1878,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqvh6fm`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqx2bci`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2184,8 +2198,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqvh6fm').then((r) => r.json()),
-    fetch('far.json?v=muqvh6fm').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muqx2bci').then((r) => r.json()),
+    fetch('far.json?v=muqx2bci').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => {
     views = v; far = f;
     if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]);
@@ -2223,7 +2237,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqvh6fm`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muqx2bci`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2585,7 +2599,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqvh6fm`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=muqx2bci`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -2812,7 +2826,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqvh6fm`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=muqx2bci`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

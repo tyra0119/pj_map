@@ -190,6 +190,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 .picked .name i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
 .picked p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 .picked button { justify-self: start; font: inherit; font-size: 12px; color: var(--lamp); background: none; border: 0; padding: 2px 0; cursor: pointer; }
+/* 選択を外すボタン: 路線名の横と、いちばん下（見つけやすいように枠つきで） */
+.picked .pclose { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--fg); background: rgba(255, 255, 255, 0.08); border: 1px solid #3A4B62; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.picked .pclose:hover, .picked .pclear:hover { background: rgba(242, 181, 68, 0.15); border-color: var(--lamp); }
+.picked .pclear { justify-self: stretch; margin-top: 6px; font-size: 13px; color: var(--fg); background: rgba(255, 255, 255, 0.05); border: 1px solid #3A4B62; border-radius: 7px; padding: 7px; text-align: center; }
 
 /* 断面の目安図（地面からの深さ） */
 .gauge { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
@@ -265,7 +269,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   <div class="card" id="stationCard" hidden aria-live="polite"></div>
 
   <div class="picked" id="picked" hidden>
-    <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span></div>
+    <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span><button class="pclose" id="clearPickTop" aria-label="路線の選択を外す">✕ 選択を外す</button></div>
     <p id="pickedInfo"></p>
     <div class="profile" id="pickedProfile"></div>
     <div class="flyrow">
@@ -275,7 +279,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         <button data-mul="0.5" aria-pressed="false">ゆっくり</button><button data-mul="1" aria-pressed="true">ふつう</button><button data-mul="2" aria-pressed="false">速い</button><button data-mul="4" aria-pressed="false">最速</button>
       </div>
     </div>
-    <button id="clearPick">選択を外す</button>
+    <button class="pclear" id="clearPick">✕ 路線の選択を外す</button>
+    <p class="hint">地図の何もない所を押すか、Esc キーでも外せます。</p>
   </div>
 
   <section class="pane" id="pane-safe" role="tabpanel" aria-labelledby="tab-safe">
@@ -460,7 +465,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqvc7fw').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqvh6fm').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -490,7 +495,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqvc7fw').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqvh6fm').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -498,7 +503,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqvc7fw').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqvh6fm').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -1163,12 +1168,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqvc7fw').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqvh6fm').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqvc7fw`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqvh6fm`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1190,7 +1195,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqvc7fw').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqvh6fm').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1711,7 +1716,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqvc7fw').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqvh6fm').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1792,7 +1797,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqvc7fw').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqvh6fm').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1859,7 +1864,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqvc7fw`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqvh6fm`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2006,6 +2011,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     redraw();
   });
   document.getElementById('clearPick').addEventListener('click', () => pick(null));
+  document.getElementById('clearPickTop').addEventListener('click', () => pick(null));
+  // Esc キーで路線の選択を外す（文字を入力しているときは除く）
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || state.picked === null) return;
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    pick(null);
+  });
   document.getElementById('flyFwd').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked, false); });
   document.getElementById('flyRev').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked, true); });
   const panel = document.getElementById('panel'), tp = document.getElementById('togglePanel');
@@ -2172,8 +2184,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqvc7fw').then((r) => r.json()),
-    fetch('far.json?v=muqvc7fw').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muqvh6fm').then((r) => r.json()),
+    fetch('far.json?v=muqvh6fm').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => {
     views = v; far = f;
     if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]);
@@ -2211,7 +2223,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqvc7fw`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muqvh6fm`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2573,7 +2585,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqvc7fw`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=muqvh6fm`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -2800,7 +2812,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqvc7fw`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=muqvh6fm`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

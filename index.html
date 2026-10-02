@@ -448,7 +448,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqksd3d').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqldjdc').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -478,7 +478,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqksd3d').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqldjdc').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -486,7 +486,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqksd3d').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqldjdc').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -870,6 +870,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       html = `<b style="color:rgb(${o.rgb.slice(0, 3)})">■</b> <b>${o.rw} ${o.type}</b><br><span class="sub">${o.dest ? o.dest + '行き・' : ''}${o.no}<br>${o.at}・${delay}${o.z < -1 ? `<br>地下 約 ${Math.round(-o.z)}m を走行中` : ''}</span>`;
     } else if (info.layer.id === 'bldg') {
       html = `<b>ビル</b> 高さ 約 ${o.h}m<br><span class="sub">地下鉄でいちばん深い大江戸線（約 32m）の ${(o.h / 32).toFixed(1)} 倍</span>`;
+    } else if (!o.name || !Array.isArray(o.lines)) {
+      // 駅でないもの（ほかの層）は出さない（駅だと思って読むと、エラーが描くたびに起きて画面が止まった）
+      tip.hidden = true; return;
     } else {
       html = `<b>${o.name}駅</b><br><span class="sub">${o.lines.map((li) => lines[li].name).join('、')}${o.zmin < 0 ? `<br>いちばん深いホーム 約 ${Math.round(-o.zmin)}m（目安）` : ''}${o.flood ? `<br>洪水の浸水想定 ${FLOOD[o.flood][0]}（想定最大規模）` : ''}${o.pw ? `<br>駅の中: ホームは地下 ${-o.pw.floor} 階。出入口から ${o.pw.fast ? '最短 約 ' + o.pw.fast.len + 'm' : '—'}${o.pw.elev ? '・エレベーターだけで 約 ' + o.pw.elev.len + 'm' : '・エレベーターだけの道はデータに無し'}` : ''}${o.pax ? `<br>1 日の乗降 約 ${o.pax >= 10000 ? (o.pax / 10000).toFixed(1) + ' 万' : o.pax.toLocaleString()} 人（目安）` : ''}</span>`;
     }
@@ -1145,12 +1148,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqksd3d').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqldjdc').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqksd3d`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqldjdc`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1170,7 +1173,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqksd3d').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqldjdc').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1690,7 +1693,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqksd3d').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqldjdc').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1771,7 +1774,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqksd3d').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqldjdc').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1838,7 +1841,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqksd3d`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqldjdc`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2130,8 +2133,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqksd3d').then((r) => r.json()),
-    fetch('far.json?v=muqksd3d').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muqldjdc').then((r) => r.json()),
+    fetch('far.json?v=muqldjdc').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => { views = v; far = f; if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]); return v; }));
   const seeTiles = new Map();
   let seeRedrawTimer = 0;
@@ -2141,7 +2144,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqksd3d`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muqldjdc`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2501,7 +2504,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqksd3d`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=muqldjdc`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -2511,12 +2514,12 @@ onmessage = (e) => {
     const mat = { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [40, 40, 40] };
     return loaded.slice(0, ALLB_KEEP).map(([k, v]) => (v.mesh
       ? new deck.SimpleMeshLayer({
-        id: 'bldg-all-' + k, data: [v], mesh: v.mesh, visible: near, pickable: near, getPosition: (d) => [d.o[0], d.o[1], 0], getScale: [1, 1, state.exagH],
+        id: 'bldg-all-' + k, data: [v], mesh: v.mesh, visible: near, pickable: false, getPosition: (d) => [d.o[0], d.o[1], 0], getScale: [1, 1, state.exagH],
         getColor: [255, 255, 255, 255], updateTriggers: { getScale: [state.exagH] }, material: mat,
       })
       : new deck.SolidPolygonLayer({
         id: 'bldg-all-' + k, data: v.polys, visible: near, getPolygon: (d) => d.rings, extruded: true, getElevation: (d) => d.h * hr(), updateTriggers: { getElevation: [hr()] },
-        getFillColor: allBColor, modelMatrix: modelMatrix(), pickable: near, material: mat,
+        getFillColor: allBColor, modelMatrix: modelMatrix(), pickable: false, material: mat,
       })));
   }
   // 押した地点から目標の方を、低い角度で見る
@@ -2725,7 +2728,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqksd3d`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=muqldjdc`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

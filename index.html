@@ -21,6 +21,10 @@ html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; overflow: hidden; }
 #map { position: absolute; inset: 0; }
 #map canvas { outline: none; }
+/* 目印の名前（富士山・スカイツリー・花火の会場）。低い角度から見ると立体図の文字が描かれないことがあるので、画面の上に重ねる */
+.landlabels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+.landlabels span { position: absolute; transform: translate(-50%, -100%); padding-bottom: 6px; font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap;
+  text-shadow: 0 0 3px #0A0F15, 0 0 3px #0A0F15, 0 0 6px #0A0F15; }
 
 .panel {
   position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 300px; max-height: calc(100% - 24px);
@@ -146,6 +150,7 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .seeAt[hidden] { display: none; }
 .seeAt.ok { border-color: rgba(90, 230, 140, 0.7); } .seeAt.ng { border-color: rgba(229, 72, 77, 0.7); }
 .seeAt span { color: var(--muted); font-size: 11.5px; }
+.seeAt .lookbtn { justify-self: start; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--lamp); background: rgba(242, 181, 68, 0.1); border: 1px solid rgba(242, 181, 68, 0.5); border-radius: 7px; padding: 5px 9px; cursor: pointer; margin-top: 3px; }
 .hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
 .hint[hidden] { display: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
@@ -217,6 +222,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 </style>
 
 <div id="map" aria-label="日本の鉄道の立体図。ドラッグで移動、ホイールやピンチで拡大縮小"></div>
+<div id="landLabels" class="landlabels" aria-hidden="true"></div>
 <div class="loading" id="loading">全国の鉄道データを読み込んでいます…</div>
 
 <aside class="panel" id="panel">
@@ -225,7 +231,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <button class="toggle-panel" id="togglePanel" aria-expanded="true">たたむ</button>
   </div>
 
-  <button class="tourbtn" id="tourBtn">▶ 見どころツアー（約 2 分）</button>
+  <button class="tourbtn" id="tourBtn">▶ 見どころツアー（約 2 分半）</button>
 
   <div class="group search">
     <label class="label" for="q">駅を探す</label>
@@ -284,7 +290,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       <div class="legend" id="seeLegend"></div>
       <p class="hint">地面を押すと、そこから見えるかを調べます（線が緑なら見える、赤なら建物にさえぎられる）。</p>
       <div class="seeAt" id="seeAt" hidden></div>
-      <p class="hint" id="seeExag" hidden>見通しを正しく見るため、高さの強調を ×1（実物どおり）にしました。「なし」に戻すと元の倍率に戻ります。</p>
+      <p class="hint" id="seeExag" hidden>見通しを正しく見るため、高さの強調を ×1（実物どおり）、表示する区間を「地上・高架」にしました。「なし」に戻すと元に戻ります。</p>
       <span class="label" id="seeListLabel"></span>
       <p class="hint">駅を押すと、その駅から歩いて行ける範囲でいちばんよく見える地上の場所へ移ります。</p>
       <ol class="rank" id="seeList"></ol>
@@ -427,7 +433,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqgaryk').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqhrfxx').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -457,7 +463,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqgaryk').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqhrfxx').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -465,7 +471,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqgaryk').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqhrfxx').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -701,8 +707,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const st = cached('st', stKey, () => stations.filter(showStation));
     const deepSt = cached('deep', stKey, () => st.filter((s) => s.zmin < 0));
     const baseTiles = state.map ? tilesFor(tileUrl, MAP_STYLES[state.mapStyle].zmin, 18) : [], floodTiles = state.flood ? tilesFor(floodUrl, 2, 17) : [];
-    const seeL = seeLayers();
-    tileKey = baseTiles.map((t) => t.id).join(',') + '|' + floodTiles.map((t) => t.id).join(',') + '|' + seeKey;
+    const seeL = seeLayers(), allBL = allBldgLayers();
+    tileKey = baseTiles.map((t) => t.id).join(',') + '|' + floodTiles.map((t) => t.id).join(',') + '|' + seeKey + '|' + allBKey;
     const groundAlpha = state.mode === 'under' ? 60 : 135;
     return [
       new deck.PathLayer({
@@ -758,11 +764,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }),
       new deck.SolidPolygonLayer({
         // データを空にして消すと底面が残るので、データはそのままで visible で切り替える
-        id: 'bldg', data: bldgs, visible: state.bldg && state.mode !== 'under', getPolygon: (d) => d.rings, extruded: true,
+        id: 'bldg', data: bldgs, visible: state.bldg && state.mode !== 'under' && !allBL.length, getPolygon: (d) => d.rings, extruded: true,
         getElevation: (d) => d.h * hr(), updateTriggers: { getElevation: [hr()] }, getFillColor: bldgColor, modelMatrix: mm, pickable: true,
         autoHighlight: true, highlightColor: [255, 255, 255, 90],
         material: { ambient: 0.55, diffuse: 0.5, shininess: 8, specularColor: [40, 40, 40] },
       }),
+      ...allBL,
       // 運行情報のある路線を太い帯で（見合わせ・運休は赤、ほかは琥珀色）
       new deck.PathLayer({
         id: 'info', data: state.info ? cached('info', kindKey + '|' + infoStamp, () => segs.filter((s) => infoByLi.has(s.li) && visibleSeg(s))) : [], getPath: segPath,
@@ -977,6 +984,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       layers: (lastLayers = layers()),
       onHover, onClick,
       // 描画でエラーが起きたら画面に出す（端末ごとの不具合を調べるため）
+      onAfterRender: () => placeLandLabels(),
       onError: (err, layer) => { console.error(err); toast(`描画エラー${layer ? '（' + layer.id + '）' : ''}: ${String(err && err.message || err).slice(0, 120)}`); },
       getCursor: ({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab'),
       onViewStateChange: ({ viewState: vs0 }) => {
@@ -1117,12 +1125,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqgaryk').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqhrfxx').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqgaryk`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqhrfxx`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1142,7 +1150,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqgaryk').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqhrfxx').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1662,7 +1670,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqgaryk').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqhrfxx').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1743,7 +1751,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqgaryk').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqhrfxx').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1810,7 +1818,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqgaryk`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqhrfxx`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1983,7 +1991,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const v = currentSettings();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(v)); } catch (e) { /* 覚えられないときはそのまま */ }
   }
-  const currentSettings = () => { const v = { mode: state.mode, kinds: [...state.kinds], exag: state.exag, exagH: state.exagH, mapStyle: state.mapStyle, see: state.see }; for (const k of Object.keys(CHECKS)) v[k] = !!state[k]; return v; };
+  const currentSettings = () => { const v = { mode: state.mode, kinds: [...state.kinds], exag: state.exag, exagH: state.exagH, mapStyle: state.mapStyle, see: state.see }; for (const k of Object.keys(CHECKS)) v[k] = !!state[k];
+    // ここなら見えるで一時的に変えている 高さの強調・区間・地図は、変える前の値を覚える（戻したときにそれに戻るように）
+    if (seePrev) { v.mode = seePrev.mode; v.exagH = seePrev.h; v.map = seePrev.map; }
+    return v; };
   function restoreSettings() {
     // まず、チェックと倍率の見た目を中身（state）にそろえる（ブラウザのフォームの復元で食い違うことがある）
     for (const [k, id] of Object.entries(CHECKS)) { const el = document.getElementById(id); if (el) el.checked = !!state[k]; }
@@ -1996,6 +2007,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (!v) return;
     restoring = true;
     try {
+      // ここなら見えるはいったん消してから（一時的に変えていた値を戻し、覚えていた値を入れ、最後にまた入れる）
+      if (typeof v.see === 'string' && state.see) setSee('', false);
       // ボタンやチェックを押したのと同じにして、読み込みなども動かす。ビルは入れると倍率を下げるので、倍率はいちばん後で
       if (v.mode && v.mode !== state.mode) document.getElementById({ all: 'modeAll', under: 'modeUnder', above: 'modeAbove' }[v.mode])?.click();
       if (Array.isArray(v.kinds)) for (const b of document.querySelectorAll('#chips button')) {
@@ -2013,8 +2026,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       if (typeof v.exag === 'number' && v.exag !== state.exag) {
         state.exag = v.exag; exag.value = v.exag; document.getElementById('exagVal').textContent = '×' + v.exag; document.getElementById('bldgHint').hidden = true; redraw();
       }
-      if (typeof v.see === 'string' && v.see !== state.see) setSee(v.see, false);
       if (typeof v.exagH === 'number' && v.exagH !== state.exagH) { setExagH(v.exagH); document.getElementById('bldgHint').hidden = true; redraw(); }
+      // ここなら見えるは最後に（入れると 高さ×1・地上だけにするので、元の値を戻したあとで）
+      if (v.see) setSee(v.see, false);
     } finally { restoring = false; }
   }
   // ---- 地下駅の防災（大雨のとき、地下鉄にいたら） ----
@@ -2080,11 +2094,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   // view/{z}/{x}/{y}.png の R＝花火・G＝スカイツリー・B＝富士山の見え方の段階（A＝255 が地上）を読み、選んだものだけ色を付けて地面に貼る
   let views = null, viewsLoading = null;
   const SEE = {
-    fw: { ch: 0, pal: [[8, 12, 20, 45], [242, 181, 68, 175], [255, 70, 160, 205]] },
-    st: { ch: 1, pal: [[8, 12, 20, 45], [150, 120, 255, 165], [70, 150, 255, 185], [80, 230, 255, 215]] },
-    fj: { ch: 2, pal: [[8, 12, 20, 45], [242, 220, 90, 185], [100, 230, 130, 215]] },
+    fw: { ch: 0, pal: [[0, 0, 0, 0], [242, 181, 68, 175], [255, 70, 160, 205]] },
+    st: { ch: 1, pal: [[0, 0, 0, 0], [150, 120, 255, 165], [70, 150, 255, 185], [80, 230, 255, 215]] },
+    fj: { ch: 2, pal: [[0, 0, 0, 0], [242, 220, 90, 185], [100, 230, 130, 215]] },
   };
-  const loadViews = () => viewsLoading || (viewsLoading = fetch('views.json?v=muqgaryk').then((r) => r.json()).then((v) => { views = v; return v; }));
+  const loadViews = () => viewsLoading || (viewsLoading = fetch('views.json?v=muqhrfxx').then((r) => r.json()).then((v) => { views = v; return v; }));
   const seeTiles = new Map();
   let seeRedrawTimer = 0;
   // タイルを読み、画素の値をとっておく（色を付けるのは選んだものに合わせてあとで）
@@ -2093,7 +2107,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {} };
-      t.ready = fetch(`view/${id}.png?v=muqgaryk`).then((r) => r.blob())
+      t.ready = fetch(`view/${id}.png?v=muqhrfxx`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2209,9 +2223,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     state.seePt = rec;
     const L = V.levels.find((l) => l[0] === rec.v);
     box.hidden = false;
-    box.innerHTML = '<b></b><span></span>';
-    box.firstChild.textContent = rec.v < 0 ? 'ここは調べられません' : rec.v === 0 ? '見えない（建物にさえぎられる）' : L[1];
-    box.lastChild.textContent = rec.v < 0 ? '建物の中か、データの範囲（23区の建物）の外です。道や広場のマスを押してください。' : `${note}${where}。地上（目の高さ ${views.eye}m）から、建物のすき間を通して見えるかの目安です。`;
+    box.innerHTML = '<b></b><span></span>' + (rec.v >= 0 ? '<button class="lookbtn"></button>' : '');
+    if (rec.v >= 0) { const lb = box.querySelector('.lookbtn'); lb.textContent = `▶ ここから${{ fw: '花火', st: 'スカイツリー', fj: '富士山' }[kind]}の方を見る`; lb.onclick = () => lookFrom(rec); }
+    box.querySelector('b').textContent = rec.v < 0 ? 'ここは調べられません' : rec.v === 0 ? '見えない（建物にさえぎられる）' : L[1];
+    box.querySelector('span').textContent = rec.v < 0 ? '建物の中か、データの範囲（23区の建物）の外です。道や広場のマスを押してください。' : `${note}${where}。地上（目の高さ ${views.eye}m）から、建物のすき間を通して見えるかの目安です。`;
     box.className = 'seeAt ' + (rec.v > 0 ? 'ok' : 'ng');
     redraw();
   }
@@ -2227,17 +2242,131 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       id: 'see-pt', data: p ? [p] : [], getPosition: (d) => [d.x, d.y, 0], getRadius: 7, radiusUnits: 'pixels', billboard: true, modelMatrix: mm,
       stroked: true, getFillColor: (d) => (d.v > 0 ? [90, 230, 140, 255] : [229, 72, 77, 255]), getLineColor: [255, 255, 255, 255], lineWidthUnits: 'pixels', getLineWidth: 2,
     }));
-    const marks = !state.see || !views ? [] : state.see === 'fw' ? views.fw.venues.map(([n, lo, la]) => ({ n: n.replace(/（.*/, ''), p: fromLonLat(lo, la) }))
-      : state.see === 'st' ? [{ n: '東京スカイツリー', p: fromLonLat(views.st.at[0], views.st.at[1]) }] : [];
+    const marks = [];
     out.push(new deck.TextLayer({
       id: 'see-marks', data: marks, getPosition: (d) => [d.p[0], d.p[1], 0], getText: (d) => d.n, getSize: 13, getColor: [255, 255, 255, 240],
       getPixelOffset: [0, 14], outlineWidth: 3, outlineColor: [10, 15, 21, 230], fontSettings: { sdf: true }, fontWeight: 700,
       fontFamily: '"Zen Kaku Gothic New", sans-serif', characterSet: 'auto', billboard: true, modelMatrix: mm,
     }));
-    return [...out, fwLayer()];
+    return [...out, ...seeLandLayers(), fwLayer()];
+  }
+  // 回転体の形（[半径 m, 高さ m] の並び）を SimpleMeshLayer の形に
+  function lathe(prof, seg = 28) {
+    const P = [], Nn = [];
+    for (let k = 0; k + 1 < prof.length; k++) {
+      const [r0, z0] = prof[k], [r1, z1] = prof[k + 1], L = Math.hypot(r1 - r0, z1 - z0) || 1, nr = (z1 - z0) / L, nz = -(r1 - r0) / L;
+      for (let j = 0; j < seg; j++) {
+        const a0 = j / seg * 2 * Math.PI, a1 = (j + 1) / seg * 2 * Math.PI;
+        const v = (r, z, a) => [r * Math.cos(a), r * Math.sin(a), z], n = (a) => [nr * Math.cos(a), nr * Math.sin(a), nz];
+        P.push(...v(r0, z0, a0), ...v(r0, z0, a1), ...v(r1, z1, a1), ...v(r0, z0, a0), ...v(r1, z1, a1), ...v(r1, z1, a0));
+        Nn.push(...n(a0), ...n(a1), ...n(a1), ...n(a0), ...n(a1), ...n(a0));
+      }
+    }
+    return { attributes: { POSITION: { value: new Float32Array(P), size: 3 }, NORMAL: { value: new Float32Array(Nn), size: 3 }, TEXCOORD_0: { value: new Float32Array(P.length / 3 * 2), size: 2 } } };
+  }
+  // スカイツリー（634m。展望デッキ 350m・展望回廊 450m のふくらみ）と富士山（3,776m。上の 1,100m を雪の白で）
+  const MESH_TOWER = lathe([[0, 0], [36, 0], [30, 150], [24, 330], [24, 338], [48, 340], [48, 356], [22, 358], [18, 440], [38, 442], [38, 452], [14, 454], [10, 500], [4, 634], [0, 634]], 20);
+  const MESH_FUJI = lathe([[0, 0], [21000, 0], [15000, 400], [10000, 900], [6500, 1500], [4300, 2100], [2900, 2680]], 40);
+  const MESH_SNOW = lathe([[2900, 2680], [1900, 3100], [950, 3500], [420, 3776], [0, 3776]], 40);
+  function seeLandLayers() {
+    landLabels = [];
+    if (!state.see || !views) return [];
+    const out = [], H = state.exagH, lab = [];
+    if (state.see === 'st') {
+      const p = fromLonLat(views.st.at[0], views.st.at[1]);
+      out.push(new deck.SimpleMeshLayer({ id: 'see-tower', data: [p], mesh: MESH_TOWER, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+        getColor: [226, 236, 252, 255], material: { ambient: 0.55, diffuse: 0.6, shininess: 30, specularColor: [120, 120, 140] } }));
+      lab.push({ p: [p[0], p[1], 634 * H], t: '東京スカイツリー 634m' });
+    }
+    if (state.see === 'fj') {
+      const p = fromLonLat(views.fj.at[0], views.fj.at[1]);
+      out.push(new deck.SimpleMeshLayer({ id: 'see-fuji', data: [p], mesh: MESH_FUJI, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+        getColor: [74, 96, 132, 255], material: { ambient: 0.55, diffuse: 0.6 } }));
+      out.push(new deck.SimpleMeshLayer({ id: 'see-snow', data: [p], mesh: MESH_SNOW, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+        getColor: [246, 249, 255, 255], material: { ambient: 0.7, diffuse: 0.5 } }));
+      lab.push({ p: [p[0], p[1], 3776 * H], t: '富士山 3,776m' });
+      // 富士山の方向: 押した地点（無ければ東京駅）から富士山まで地面に線
+      const sp = state.seePt && state.seePt.kind === 'fj' && state.seePt.v >= 0 ? [state.seePt.x, state.seePt.y] : fromLonLat(139.7671, 35.6812);
+      out.push(new deck.LineLayer({ id: 'see-fujidir', data: [{ a: sp, b: p }], getSourcePosition: (d) => [d.a[0], d.a[1], 0], getTargetPosition: (d) => [d.b[0], d.b[1], 0],
+        getColor: [242, 220, 90, 170], getWidth: 2, widthUnits: 'pixels' }));
+      const mid = [sp[0] + (p[0] - sp[0]) * 0.02, sp[1] + (p[1] - sp[1]) * 0.02];
+      lab.push({ p: [mid[0], mid[1], 0], t: '← 富士山の方向' });
+    }
+    if (state.see === 'fw') for (const [n, lo, la] of views.fw.venues) { const q = fromLonLat(lo, la); lab.push({ p: [q[0], q[1], 0], t: n.replace(/（.*/, '') }); }
+    landLabels = lab;
+    return out;
+  }
+  // 目印の名前を、描くたびに画面の位置へ（カメラの後ろや画面の外なら出さない）
+  let landLabels = [];
+  const landBox = document.getElementById('landLabels');
+  function placeLandLabels() {
+    const vp = deckgl && deckgl.getViewports()[0];
+    const items = state.see && vp ? landLabels : [];
+    while (landBox.children.length < items.length) landBox.appendChild(document.createElement('span'));
+    [...landBox.children].forEach((el, i) => {
+      const it = items[i];
+      let show = false;
+      if (it) {
+        const [x, y, z] = vp.project(it.p);
+        // カメラの後ろの点は奥行きが 0〜1 の外になる
+        show = z > 0 && z < 1 && x > -50 && x < vp.width + 50 && y > -20 && y < vp.height + 40;
+        if (show) { el.textContent = it.t; el.style.left = x + 'px'; el.style.top = y + 'px'; }
+      }
+      el.hidden = !show;
+    });
+  }
+  // 全部の建物の立体（花火とスカイツリーのまわり 3.5km。寄ったときだけ、見ている範囲のタイルを読む）
+  const allB = new Map();
+  let bkSet = null, allBKey = '';
+  const N23 = 2 ** 23, LAM0 = D.lon0 * Math.PI / 180, MY0 = mercY(D.lat0);
+  function decodeB(tx, ty, arr) {
+    const out = [];
+    for (const [h, ...rings] of arr) {
+      // 外側の輪（最初の輪と同じ回り）ごとに 1 つの面。逆回りの輪はその穴
+      let poly = null, sign0 = 0;
+      for (const fl of rings) {
+        const r = [];
+        let a = 0;
+        for (let k = 0; k < fl.length; k += 2) {
+          const gx0 = tx * 256 + fl[k] / 4, gy0 = ty * 256 + fl[k + 1] / 4;
+          r.push([(gx0 * 2 * Math.PI / N23 - Math.PI - LAM0) * RK, (Math.PI - gy0 * 2 * Math.PI / N23 - MY0) * RK]);
+        }
+        for (let k = 0, m = r.length - 1; k < r.length; m = k++) a += (r[m][0] - r[k][0]) * (r[m][1] + r[k][1]);
+        const sg = Math.sign(a);
+        if (!poly || sg === sign0) { if (!poly) sign0 = sg; poly = { h: h / 10, rings: [r] }; out.push(poly); } else poly.rings.push(r);
+      }
+    }
+    return out;
+  }
+  const allBColor = (d) => { const t = Math.min(1, d.h / 60) ** 0.7; return [Math.round(72 + 90 * t), Math.round(82 + 90 * t), Math.round(100 + 90 * t), 255]; };
+  function allBldgLayers() {
+    allBKey = '';
+    if (!state.see || !views || !views.bk || current.zoom < -1.3) return [];
+    if (!bkSet) bkSet = new Set(views.bk);
+    const ts = tilesFor((z, x, y) => ({ x, y }), 15, 15).filter((t) => bkSet.has(t.url.x + '/' + t.url.y));
+    allBKey = ts.map((t) => t.id).join(',');
+    const out = [];
+    for (const t of ts) {
+      const k = t.url.x + '/' + t.url.y;
+      if (!allB.has(k)) {
+        allB.set(k, null);
+        fetch(`view/b/${k}.json?v=muqhrfxx`).then((r) => r.json()).then((arr) => { allB.set(k, decodeB(t.url.x, t.url.y, arr)); redraw(); }).catch(() => allB.delete(k));
+      }
+      const data = allB.get(k);
+      if (data) out.push(new deck.SolidPolygonLayer({
+        id: 'bldg-all-' + k, data, getPolygon: (d) => d.rings, extruded: true, getElevation: (d) => d.h * hr(), updateTriggers: { getElevation: [hr()] },
+        getFillColor: allBColor, modelMatrix: modelMatrix(), pickable: true, material: { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [40, 40, 40] },
+      }));
+    }
+    return out;
+  }
+  // 押した地点から目標の方を、低い角度で見る
+  function lookFrom(rec) {
+    const dx = rec.tgt[0] - rec.x, dy = rec.tgt[1] - rec.y, L = Math.hypot(dx, dy) || 1;
+    fly({ target: [rec.x + dx / L * 40, rec.y + dy / L * 40, 0], rotationOrbit: Math.atan2(dx, dy) * 180 / Math.PI, rotationX: 5, zoom: 2.4 }, 1800);
   }
   // 花火: 2 つの会場から、上空 100〜200m に開く玉をときどき打ち上げる（見た目だけ。開く大きさは半径 40〜90m）
-  const FW_DIRS = Array.from({ length: 42 }, (_, i) => { const z = 1 - 2 * (i + 0.5) / 42, r = Math.sqrt(1 - z * z), a = i * 2.39996; return [Math.cos(a) * r, Math.sin(a) * r, z]; });
+  const FW_DIRS = Array.from({ length: 64 }, (_, i) => { const z = 1 - 2 * (i + 0.5) / 64, r = Math.sqrt(1 - z * z), a = i * 2.39996; return [Math.cos(a) * r, Math.sin(a) * r, z]; });
   const FW_COLORS = [[255, 90, 160], [255, 210, 90], [120, 200, 255], [170, 255, 140], [255, 140, 60], [235, 235, 255]];
   let fwBursts = [], fwTimer = 0, fwLast = 0;
   function fwParticles() {
@@ -2252,7 +2381,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   function fwLayer() {
     return new deck.ScatterplotLayer({
       id: 'fw-burst', data: state.see === 'fw' ? fwParticles() : [], getPosition: (d) => [d.p[0], d.p[1], upZ(d.p[2])], getFillColor: (d) => d.c,
-      getRadius: 2.2, radiusUnits: 'pixels', billboard: true, modelMatrix: modelMatrix(), parameters: { depthWriteEnabled: false },
+      // 粒は実物で半径 4m（遠くから見ても 2 ピクセル、近くでも 7 ピクセルまで）
+      getRadius: 4, radiusUnits: 'meters', radiusMinPixels: 2, radiusMaxPixels: 7, billboard: true, modelMatrix: modelMatrix(), parameters: { depthWriteEnabled: false },
     });
   }
   function fwTick() {
@@ -2284,10 +2414,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }[kind];
     const lg = document.getElementById('seeLegend');
     lg.innerHTML = '';
-    for (const [lv, text] of [...V.levels].reverse().concat([[0, '見えない']])) {
+    for (const [lv, text] of [...V.levels].reverse().concat([[0, '色なし：見えない']])) {
       const c = SEE[kind].pal[lv], row = document.createElement('span');
       row.innerHTML = '<i></i>';
-      row.firstChild.style.background = `rgba(${c[0]},${c[1]},${c[2]},${lv ? 0.9 : 0.6})`;
+      if (lv) row.firstChild.style.background = `rgba(${c[0]},${c[1]},${c[2]},0.9)`; else row.firstChild.style.border = '1px solid var(--line)';
       row.append(text);
       lg.appendChild(row);
     }
@@ -2304,9 +2434,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
   }
   const SEE_VIEW = { fw: [139.800, 35.708, -0.9], st: [139.810, 35.712, -1.6], fj: [139.77, 35.66, -2.6] };
-  let seePrevH = 0;  // 見える場所を入れる前の高さの強調（消したら戻す）
+  // 入れる前の 高さの強調・表示する区間・地図（「なし」に戻したら元に戻す）
+  let seePrev = null;
   async function setSee(kind, moveTo = true) {
-    if (!kind && seePrevH) { setExagH(seePrevH); seePrevH = 0; document.getElementById('seeExag').hidden = true; }
+    if (!kind && seePrev) {
+      const v = seePrev; seePrev = null;
+      setExagH(v.h);
+      if (state.mode !== v.mode) document.getElementById({ all: 'modeAll', under: 'modeUnder', above: 'modeAbove' }[v.mode]).click();
+      if (state.map !== v.map) setCheck('showMap', v.map);
+      document.getElementById('seeExag').hidden = true;
+    }
+    if (kind) {
+      // 見通しを正しく見るため高さは実物どおり（×1）、地下は要らないので地上・高架だけ、地面が分かるよう地図を出す
+      if (!seePrev) seePrev = { h: state.exagH, mode: state.mode, map: state.map };
+      setExagH(1);
+      if (state.mode !== 'above') document.getElementById('modeAbove').click();
+      if (!state.map) setCheck('showMap', true);
+      document.getElementById('seeExag').hidden = false;
+    }
     state.see = kind;
     state.seePt = null;
     document.getElementById('seeAt').hidden = true;
@@ -2316,13 +2461,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       await loadViews();
       if (state.see !== kind) return;
       seePanel();
-      // 高さは実物どおり（×1）に（見通しの線や花火の高さを正しく見るため）
-      if (state.exagH !== 1) { seePrevH = state.exagH; setExagH(1); document.getElementById('seeExag').hidden = false; }
       if (kind === 'fw') fwTimer = setInterval(fwTick, 60);
       if (moveTo) { const [lo, la, z] = SEE_VIEW[kind]; fly({ target: fromLonLat(lo, la), zoom: z, rotationX: 38 }, 1400); }
     }
     saveSettings();
     redraw();
+    placeLandLabels();
   }
   for (const b of document.querySelectorAll('#seeSeg button')) b.addEventListener('click', () => setSee(b.dataset.see));
 
@@ -2358,6 +2502,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     { cap: '新宿の地下街', sub: 'オレンジ色の面が地下街の床です。駅の東口と西口に広がっています（PLATEAU 地下街モデル）。', on: ['showUbld'], view: at(139.7005, 35.6905, 0.8, -30, 36), ring: '新宿', exag: 8 },
     { cap: '北千住と浸水想定', sub: '赤っぽい色の区域が、川があふれたときに 5〜10m 浸かる想定の場所。駅の上の円柱が水の高さです。', on: ['showFlood'], view: at(139.8045, 35.7495, -2.4, -25, 28), ring: '北千住' },
     { cap: '駅の利用者数', sub: '柱が高いほど、1 日に乗り降りする人が多い駅です。渋谷・新宿・池袋がとびぬけています。', on: ['showPax'], view: at(139.73, 35.69, -3.0, -20, 36), ring: '新宿' },
+    { cap: 'ここなら花火が見える', sub: '東京23区の約 190 万棟の建物の高さから、地上で隅田川の花火が見える場所を計算しました。ピンクは低めの花火から、オレンジは大きな花火なら見える場所。会場から離れた両国駅の近くの通りからも見えます（緑の線が見通し）。', see: 'fw', seeFrom: '両国', view: at(139.7963, 35.700, -0.1, -28, 42), exag: 12, exagH: 1, mode: 'above', hold: 13000 },
+    { cap: 'スカイツリーが見える場所', sub: '荒川・隅田川の土手や、スカイツリーへまっすぐ向かう通りから見えます。水色ほど、塔の下の方まで見えます。', see: 'st', view: at(139.812, 35.713, -1.7, -20, 30), exagH: 1, mode: 'above' },
+    { cap: '富士山が見える場所', sub: '空気が澄んだ日に、建物にさえぎられずに富士山が見える場所。荒川の土手や湾岸、西南西へまっすぐ延びる通りです（緑の線が富士山の方向）。', see: 'fj', seeFrom: '台場', view: at(139.776, 35.626, -0.9, -60, 38), exagH: 1, mode: 'above', hold: 12000 },
     { cap: '大阪・梅田', sub: '東京だけでなく全国どこでも。梅田の地下には御堂筋線・四つ橋線・谷町線が通ります。', view: at(135.4985, 34.7020, -1.6, -20, 30), ring: '梅田' },
     { cap: '日本の鉄道立体図', sub: '左のメニューから、見どころ・列車・重ねる情報を自由に選べます。https://tyra0119.github.io/pj_map/', fit: true },
   ];
@@ -2408,6 +2555,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const st = TOUR[i];
     // その場面の表示だけを入れる。倍率はそのあとで（ビルを入れると倍率が ×2 に下がるため）
     for (const id of LAYER_CHECKS) setCheck(id, (st.on || []).includes(id));
+    // ここなら見える（花火・スカイツリー・富士山）。倍率より先に（入れると高さの強調を ×1 にし、消すと戻すため）
+    if (state.see !== (st.see || '')) setSee(st.see || '', false);
     const ex = st.exag || 12;
     state.exag = ex; exag.value = ex; document.getElementById('exagVal').textContent = '×' + ex; document.getElementById('bldgHint').hidden = true;
     setExagH(st.exagH || ex);
@@ -2421,10 +2570,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     showCard(st.card ? stationBy(st.card) : null);
     renderCaption();
     if (st.fit) document.getElementById('fitAll').click();
-    else if (st.view) fly(st.view, 2200);
+    else if (st.view && !st.seeFrom) fly(st.view, 2200);
     else redraw();
     if (st.fly && li >= 0) flyLine(li);
+    if (st.seeFrom) seeTourSpot(st, i);
     scheduleNext(st);
+  }
+  // ツアーの「ここなら見える」: その駅から歩いて行ける範囲でいちばんよく見える場所を、場面の角度で見せて見通しの線を引く
+  async function seeTourSpot(st, i) {
+    await loadViews();
+    const V = views[st.see], s = V.stations.find((r) => r[0] === st.seeFrom), b = s ? null : stationBy(st.seeFrom);
+    const x = s ? s[1] : b && b.x, y = s ? s[2] : b && b.y;
+    if (x == null) { fly(st.view, 2200); return; }
+    const sp = await seeSpot(x, y, V.walk, 'best');
+    if (!touring || tourIdx !== i || !sp) return;
+    fly({ ...st.view, target: [sp.x, sp.y, 0] }, 2200);
+    seeAt(sp.x, sp.y, `${st.seeFrom}駅から約 ${sp.m}m。`);
   }
   const safeTourBtn = document.getElementById('safeTourBtn');
   function playTour(kind) {
@@ -2441,7 +2602,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     clearTimeout(tourTimer); cancelAnimationFrame(orbitRaf);
     if (flying) stopFly();
     caption.hidden = true;
-    tourBtn.textContent = '▶ 見どころツアー（約 2 分）';
+    tourBtn.textContent = '▶ 見どころツアー（約 2 分半）';
     safeTourBtn.textContent = '▶ 防災ツアー（約 1 分半）';
     touring = false;
     state.found = null; pick(null); showCard(null);

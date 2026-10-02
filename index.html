@@ -294,8 +294,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       <div class="seeAt" id="seeAt" hidden></div>
       <p class="hint" id="seeExag" hidden>見通しを正しく見るため、高さの強調を ×1（実物どおり）、表示する区間を「地上・高架」にしました。「なし」に戻すと元に戻ります。</p>
       <div class="farbox" id="farBox" hidden>
+        <label class="check"><input type="checkbox" id="seeTerr" checked autocomplete="off"> 山の形を立体で表示（国土地理院の標高）</label>
         <button class="widebtn" id="farView">全国で見える範囲を見る（地形で計算）</button>
-        <span class="label">主な都市の駅から（地形だけで計算。建物は入れていない）</span>
+        <span class="label">主な都市の駅から見えるか（駅から半径 3km の範囲のうち、見える場所がどれだけあるか。地形だけで計算し、建物は入れていない）</span>
         <ol class="rank" id="farList"></ol>
       </div>
       <span class="label" id="seeListLabel"></span>
@@ -440,7 +441,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqil1im').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqj3ajt').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -470,7 +471,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqil1im').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqj3ajt').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -478,7 +479,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqil1im').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqj3ajt').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -714,8 +715,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const st = cached('st', stKey, () => stations.filter(showStation));
     const deepSt = cached('deep', stKey, () => st.filter((s) => s.zmin < 0));
     const baseTiles = state.map ? tilesFor(tileUrl, MAP_STYLES[state.mapStyle].zmin, 18) : [], floodTiles = state.flood ? tilesFor(floodUrl, 2, 17) : [];
-    const seeL = seeLayers(), allBL = allBldgLayers();
-    tileKey = baseTiles.map((t) => t.id).join(',') + '|' + floodTiles.map((t) => t.id).join(',') + '|' + seeKey + '|' + allBKey;
+    const seeL = seeLayers(), allBL = allBldgLayers(), terrL = terrLayers();
+    tileKey = baseTiles.map((t) => t.id).join(',') + '|' + floodTiles.map((t) => t.id).join(',') + '|' + seeKey + '|' + allBKey + '|' + terrKey;
     const groundAlpha = state.mode === 'under' ? 60 : 135;
     return [
       new deck.PathLayer({
@@ -748,6 +749,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       })),
       // ここなら見える（花火・スカイツリー・富士山）の色を地面に
       ...seeL,
+      // 山の形（富士山・スカイツリーのとき）
+      ...terrL,
       // 地面の板と地図に隠れて地下の線が途切れて見えないよう、地下の線を薄くもう一度重ねる
       new deck.PathLayer({
         id: 'under-through', data: under, getPath: (d) => d.path, getColor: (d) => { const c = segColor(d); return [c[0], c[1], c[2], Math.round(c[3] * 0.55)]; },
@@ -968,12 +971,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let [tx, ty, tz] = vs.target;
     const th = vs.rotationX * Math.PI / 180, ph = vs.rotationOrbit * Math.PI / 180;
     const vz = -Math.sin(th);
-    if (tz && Math.abs(vz) > 0.17) {
-      const k = tz / vz;
+    // 山の形を出しているときは、地面＝地形の高さ（平地は 0）
+    const gz0 = groundZ(tx, ty);
+    if (tz - gz0 && Math.abs(vz) > 0.17) {
+      const k = (tz - gz0) / vz;
       tx -= k * Math.cos(th) * Math.sin(ph); ty -= k * Math.cos(th) * Math.cos(ph);
     }
     tx = Math.min(maxX, Math.max(minX, tx)); ty = Math.min(maxY, Math.max(minY, ty));
-    return { ...vs, target: [tx, ty, 0] };
+    return { ...vs, target: [tx, ty, groundZ(tx, ty)] };
   }
 
   const CONTROLLER = { inertia: true, dragMode: 'pan', touchRotate: true };
@@ -1132,12 +1137,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqil1im').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqj3ajt').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqil1im`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqj3ajt`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1157,7 +1162,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqil1im').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqj3ajt').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1677,7 +1682,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqil1im').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqj3ajt').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1758,7 +1763,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqil1im').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqj3ajt').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1825,7 +1830,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqil1im`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqj3ajt`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1884,8 +1889,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   document.getElementById('clockDay').addEventListener('change', () => { if (!clock.custom) setCustom(serviceDay().minutes); else { ttFile = ''; loadTimetable().then(() => tickTrains()); } });
 
   // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----
+  let flyEnd = 0;  // fly の動きが終わる時刻（そのあいだは視点を地面に乗せ直さない）
   function fly(v, ms) {
     const nv = { ...current, ...v };
+    flyEnd = Date.now() + (reduceMotion ? 0 : ms);
     deckgl.setProps({ initialViewState: { ...nv, ...LIMITS, transitionDuration: reduceMotion ? 0 : ms, transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationX', 'rotationOrbit']) } });
     state.zoom = nv.zoom; redraw();
   }
@@ -2107,8 +2114,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqil1im').then((r) => r.json()),
-    fetch('far.json?v=muqil1im').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muqj3ajt').then((r) => r.json()),
+    fetch('far.json?v=muqj3ajt').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => { views = v; far = f; if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]); return v; }));
   const seeTiles = new Map();
   let seeRedrawTimer = 0;
@@ -2118,7 +2125,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqil1im`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muqj3ajt`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2260,11 +2267,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       // 富士山は遠いので、その方向へ 4km の線を、山頂（または 1000m 下）を見上げる角度で
       // 地図の座標は北緯 35.69° で実際の長さに合わせたメルカトルなので、富士山までの実際の距離は 平均の緯度の cos ÷ cos 35.69° 倍
       const p = fromLonLat(V.at[0], V.at[1]), d = Math.hypot(p[0] - x, p[1] - y), dm = d * Math.cos((lat + V.at[1]) / 2 * Math.PI / 180) / Math.cos(D_LAT0);
-      const h = lvH(rec.v), tan = (h - dm * dm * 0.87 / (2 * 6371000) - 1.5) / dm;
-      tgt = [x + (p[0] - x) / d * 4000, y + (p[1] - y) / d * 4000, 1.5 + tan * 4000];
+      const oh = obsElev(x, y), h = lvH(rec.v), tan = (h - dm * dm * 0.87 / (2 * 6371000) - 1.5 - oh) / dm;
+      tgt = [x + (p[0] - x) / d * 4000, y + (p[1] - y) / d * 4000, oh + 1.5 + tan * 4000];
       where = `富士山まで約 ${Math.round(dm / 1000)}km`;
     }
     rec.tgt = tgt;
+    rec.oh = obsElev(x, y);
     state.seePt = rec;
     const L = LV.find((l) => l[0] === rec.v);
     box.hidden = false;
@@ -2281,12 +2289,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const mm = modelMatrix(), out = [];
     const p = state.see && state.seePt && state.seePt.kind === state.see && state.seePt.v >= 0 ? state.seePt : null;
     out.push(new deck.LineLayer({
-      id: 'see-line', data: p ? [p] : [], getSourcePosition: (d) => [d.x, d.y, upZ(1.5)], getTargetPosition: (d) => [d.tgt[0], d.tgt[1], upZ(d.tgt[2])],
-      getColor: (d) => (d.v > 0 ? [90, 230, 140, 255] : [229, 72, 77, 255]), getWidth: 3, widthUnits: 'pixels', modelMatrix: mm,
-      updateTriggers: { getSourcePosition: [hr()], getTargetPosition: [hr()] },
+      id: 'see-line', data: p ? [p] : [], getSourcePosition: (d) => [d.x, d.y, ((d.oh || 0) + 1.5 - dropAt(d.x, d.y)) * state.exagH], getTargetPosition: (d) => [d.tgt[0], d.tgt[1], (d.tgt[2] - dropAt(d.tgt[0], d.tgt[1])) * state.exagH],
+      getColor: (d) => (d.v > 0 ? [90, 230, 140, 255] : [229, 72, 77, 255]), getWidth: 3, widthUnits: 'pixels',
+      updateTriggers: { getSourcePosition: [state.exagH, terrRefKey, terrKey], getTargetPosition: [state.exagH, terrKey] },
     }));
     out.push(new deck.ScatterplotLayer({
-      id: 'see-pt', data: p ? [p] : [], getPosition: (d) => [d.x, d.y, 0], getRadius: 7, radiusUnits: 'pixels', billboard: true, modelMatrix: mm,
+      id: 'see-pt', data: p ? [p] : [], getPosition: (d) => [d.x, d.y, ((d.oh || 0) - dropAt(d.x, d.y)) * state.exagH], updateTriggers: { getPosition: [state.exagH, terrKey] }, getRadius: 7, radiusUnits: 'pixels', billboard: true,
       stroked: true, getFillColor: (d) => (d.v > 0 ? [90, 230, 140, 255] : [229, 72, 77, 255]), getLineColor: [255, 255, 255, 255], lineWidthUnits: 'pixels', getLineWidth: 2,
     }));
     const marks = [];
@@ -2321,18 +2329,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     if (!state.see || !views) return [];
     const out = [], H = state.exagH, lab = [];
     if (state.see === 'st') {
-      const p = fromLonLat(views.st.at[0], views.st.at[1]);
-      out.push(new deck.SimpleMeshLayer({ id: 'see-tower', data: [p], mesh: MESH_TOWER, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+      const p = fromLonLat(views.st.at[0], views.st.at[1]), dz = dropAt(p[0], p[1]);
+      out.push(new deck.SimpleMeshLayer({ id: 'see-tower', data: [p], mesh: MESH_TOWER, getPosition: (d) => [d[0], d[1], -dz * H], getScale: [1, 1, H], updateTriggers: { getScale: [H], getPosition: [dz, H] },
         getColor: [226, 236, 252, 255], material: { ambient: 0.55, diffuse: 0.6, shininess: 30, specularColor: [120, 120, 140] } }));
-      lab.push({ p: [p[0], p[1], 634 * H], t: '東京スカイツリー 634m' });
+      lab.push({ p: [p[0], p[1], (634 - dz) * H], t: '東京スカイツリー 634m' });
     }
     if (state.see === 'fj') {
-      const p = fromLonLat(views.fj.at[0], views.fj.at[1]);
-      out.push(new deck.SimpleMeshLayer({ id: 'see-fuji', data: [p], mesh: MESH_FUJI, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+      const p = fromLonLat(views.fj.at[0], views.fj.at[1]), dz = dropAt(p[0], p[1]);
+      if (!terrActive()) out.push(new deck.SimpleMeshLayer({ id: 'see-fuji', data: [p], mesh: MESH_FUJI, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
         getColor: [74, 96, 132, 215], material: { ambient: 0.55, diffuse: 0.6 } }));
-      out.push(new deck.SimpleMeshLayer({ id: 'see-snow', data: [p], mesh: MESH_SNOW, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
+      if (!terrActive()) out.push(new deck.SimpleMeshLayer({ id: 'see-snow', data: [p], mesh: MESH_SNOW, getPosition: (d) => [d[0], d[1], 0], getScale: [1, 1, H], updateTriggers: { getScale: [H] },
         getColor: [246, 249, 255, 255], material: { ambient: 0.7, diffuse: 0.5 } }));
-      lab.push({ p: [p[0], p[1], 3776 * H], t: '富士山 3,776m' });
+      lab.push({ p: [p[0], p[1], (3776 - dz) * H], t: '富士山 3,776m' });
       // 富士山の方向: 押した地点（無ければ東京駅）から富士山まで地面に線
       const sp = state.seePt && state.seePt.kind === 'fj' && state.seePt.v >= 0 ? [state.seePt.x, state.seePt.y] : fromLonLat(139.7671, 35.6812);
       out.push(new deck.LineLayer({ id: 'see-fujidir', data: [{ a: sp, b: p }], getSourcePosition: (d) => [d.a[0], d.a[1], 0], getTargetPosition: (d) => [d.b[0], d.b[1], 0],
@@ -2410,7 +2418,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const k = t.url.x + '/' + t.url.y;
       if (!allB.has(k)) {
         allB.set(k, null);
-        fetch(`view/b/${k}.json?v=muqil1im`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+        fetch(`view/b/${k}.json?v=muqj3ajt`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
       }
       const data = allB.get(k);
       if (data) out.push(new deck.SolidPolygonLayer({
@@ -2491,7 +2499,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         const li = document.createElement('li');
         li.innerHTML = '<span></span> <span class="sub"></span>';
         li.children[0].textContent = name;
-        li.children[1].textContent = pct >= 5 ? `駅から 3km の ${pct}% で見える` : bl ? `駅のまわりではほぼ見えない・${bl[2]}km 先から見える` : '見えない（駅から 15km 以内に見える場所なし）';
+        const where = pct >= 80 ? '駅のまわりのほとんどの場所から見える' : pct >= 30 ? '駅のまわりの半分ほどの場所から見える' : pct >= 5 ? '駅のまわりの一部の場所から見える' : null;
+        li.children[1].textContent = where ? `${where}（半径 3km の ${pct}%）` : bl ? `駅のまわりでは見えない。${bl[2]}km 先の高い所などから見える` : '見えない（駅から 15km 以内に見える場所なし）';
         li.addEventListener('click', () => {
           const p = bl ? fromLonLat(bl[0], bl[1]) : [x, y];
           fly({ target: [p[0], p[1], 0], zoom: -1.6, rotationX: 40 }, 1600);
@@ -2552,6 +2561,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     saveSettings();
     redraw();
     placeLandLabels();
+    reground();
   }
   for (const b of document.querySelectorAll('#seeSeg button')) b.addEventListener('click', () => setSee(b.dataset.see));
   // 全国で見える範囲（富士山・スカイツリーを中心に、斜めから）
@@ -2559,6 +2569,161 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const c = state.see === 'st' ? [139.81, 35.85, -7.0] : [138.4, 35.6, -8.0];
     fly({ target: fromLonLat(c[0], c[1]), zoom: c[2], rotationOrbit: 0, rotationX: 25 }, 1800);
   });
+
+  // ---- 山の形（地形）: 富士山・スカイツリーを選んでいるときに、国土地理院の標高で地形を立体に ----
+  // 遠くはズーム 8（1 点約 1km）、見ている場所から 30km 以内はズーム 10（約 250m）。地球の丸みと屈折で沈むぶん（見ている場所から測る）も入れる
+  // 面には高さの色と「見える範囲」の色を貼る。標高 40m より低い平地は透明にして、下の地図と東京の詳しい色を見せる
+  class TerrainMeshLayer extends deck.SimpleMeshLayer {
+    getShaders() {
+      const sh = super.getShaders();
+      // 透明なところは奥行きも書かない（平地の下の線や地図を隠さないように）
+      sh.inject = { ...(sh.inject || {}), 'fs:DECKGL_FILTER_COLOR': 'if (color.a < 0.04) discard;' };
+      return sh;
+    }
+  }
+  TerrainMeshLayer.layerName = 'TerrainMeshLayer';
+  let terrOn = true;
+  const terrData = new Map();
+  const R_EFF = 6371000 / (1 - 0.13), TERR_LOW = 40;
+  let terrRef = null, terrRefKey = '', terrKey = '';
+  const pxX = (g, z) => (g * 2 * Math.PI / (256 * 2 ** z) - Math.PI - LAM0) * RK;
+  const pxY = (g, z) => (Math.PI - g * 2 * Math.PI / (256 * 2 ** z) - MY0) * RK;
+  const xPx = (x, z) => (x / RK + Math.PI + LAM0) / (2 * Math.PI) * 256 * 2 ** z;
+  const yPx = (y, z) => (Math.PI - (y / RK + MY0)) / (2 * Math.PI) * 256 * 2 ** z;
+  const terrActive = () => terrOn && far && far.terr && (state.see === 'fj' || state.see === 'st');
+  const dropAt = (x, y) => (terrRef && terrActive() ? ((x - terrRef[0]) ** 2 + (y - terrRef[1]) ** 2) / (2 * R_EFF) : 0);
+  let terr8 = null, terr10 = null;
+  // 標高の色（暗い地図に合う落ち着いた色。2,700m より上は雪の白）
+  function hypso(h) {
+    const st = [[0, [72, 104, 84]], [300, [98, 118, 82]], [800, [128, 120, 86]], [1500, [124, 104, 84]], [2300, [140, 132, 126]], [2700, [214, 220, 228]], [3200, [240, 244, 250]]];
+    for (let k = 1; k < st.length; k++) if (h < st[k][0]) { const [h0, c0] = st[k - 1], [h1, c1] = st[k], f = (h - h0) / (h1 - h0); return [0, 1, 2].map((i) => c0[i] + (c1[i] - c0[i]) * f); }
+    return st[st.length - 1][1];
+  }
+  function terrLoad(k) {
+    let t = terrData.get(k);
+    if (t) return t;
+    const [z, x, y] = k.split('/').map(Number);
+    t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
+    terrData.set(k, t);
+    fetch(`view/terr/${k}.bin?v=muqj3ajt`).then((r) => r.arrayBuffer()).then((b) => {
+      t.g = new Int16Array(b);
+      // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
+      if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });
+      redraw();
+      reground();
+    }).catch(() => {});
+    return t;
+  }
+  // 格子の点 (i, j) の標高（海は 0）
+  const gh = (t, i, j) => { const v = t.g[j * 129 + i]; return v === -32768 ? 0 : v; };
+  function terrMesh(t) {
+    const H = state.exagH, P = new Float32Array(129 * 129 * 3), Nn = new Float32Array(129 * 129 * 3), U = new Float32Array(129 * 129 * 2);
+    for (let j = 0; j <= 128; j++) for (let i = 0; i <= 128; i++) {
+      const o = j * 129 + i, gx0 = t.x * 256 + i * 2, gy0 = t.y * 256 + j * 2;
+      const X = pxX(gx0, t.z), Y = pxY(gy0, t.z);
+      P[o * 3] = X - t.ox; P[o * 3 + 1] = Y - t.oy; P[o * 3 + 2] = (gh(t, i, j) - dropAt(X, Y)) * H;
+      U[o * 2] = i / 128; U[o * 2 + 1] = j / 128;
+    }
+    // 法線（となりの点との差から）
+    for (let j = 0; j <= 128; j++) for (let i = 0; i <= 128; i++) {
+      const o = j * 129 + i, a = j * 129 + Math.max(0, i - 1), b = j * 129 + Math.min(128, i + 1), c = Math.max(0, j - 1) * 129 + i, d = Math.min(128, j + 1) * 129 + i;
+      const dx = P[b * 3] - P[a * 3] || 1, dzx = P[b * 3 + 2] - P[a * 3 + 2], dy = P[d * 3 + 1] - P[c * 3 + 1] || -1, dzy = P[d * 3 + 2] - P[c * 3 + 2];
+      let nx = -dzx / dx, ny = -dzy / dy, nz = 1; const L = Math.hypot(nx, ny, nz); nx /= L; ny /= L; nz /= L;
+      Nn[o * 3] = nx; Nn[o * 3 + 1] = ny; Nn[o * 3 + 2] = nz;
+    }
+    const idx = new Uint32Array(128 * 128 * 6);
+    let n = 0;
+    for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
+      const a = j * 129 + i, b = a + 1, c = a + 129, d = c + 1;
+      idx[n++] = a; idx[n++] = c; idx[n++] = b; idx[n++] = b; idx[n++] = c; idx[n++] = d;
+    }
+    return { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: Nn, size: 3 }, TEXCOORD_0: { value: U, size: 2 } }, indices: { value: idx, size: 1 } };
+  }
+  // 面に貼る絵: 高さの色＋見える範囲の色。平地（40m 未満）と海は透明
+  function terrTex(t, kind) {
+    if (t.tex[kind]) return t.tex[kind];
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d'), im = g.createImageData(256, 256);
+    const ft = far.has[t.z] && far.has[t.z].has(t.x + '/' + t.y) ? seeTile(t.z, t.x, t.y, 'view/far') : null, fd = ft && ft.data;
+    const pal = SEE[kind].pal, ch = FAR_CH[kind];
+    for (let py = 0; py < 256; py++) for (let px = 0; px < 256; px++) {
+      // 格子（2 ピクセルに 1 点）から双一次で
+      const fx = px / 2, fy = py / 2, i0 = Math.min(127, fx | 0), j0 = Math.min(127, fy | 0), u = fx - i0, v = fy - j0;
+      const raw = t.g[Math.round(fy) * 129 + Math.round(fx)];
+      const o = (py * 256 + px) * 4;
+      if (raw === -32768) continue;
+      const h = gh(t, i0, j0) * (1 - u) * (1 - v) + gh(t, i0 + 1, j0) * u * (1 - v) + gh(t, i0, j0 + 1) * (1 - u) * v + gh(t, i0 + 1, j0 + 1) * u * v;
+      if (h < TERR_LOW) continue;
+      let col = hypso(h);
+      // 2,600m より上（富士山の雪のところ）は見える範囲の色を重ねない
+      if (fd && h < 2600) { const q = (py * 256 + px) * 4, lv = fd[q + 3] ? fd[q + ch] : 0; if (lv) { const p = pal[lv]; col = [0, 1, 2].map((k) => col[k] * 0.3 + p[k] * 0.7); } }
+      im.data[o] = col[0]; im.data[o + 1] = col[1]; im.data[o + 2] = col[2];
+      im.data[o + 3] = Math.min(255, Math.round((h - TERR_LOW) / 80 * 255));
+    }
+    g.putImageData(im, 0, 0);
+    return (t.tex[kind] = c);
+  }
+  // 地形の標高（m）。読み込んでいなければ null
+  function terrElev(x, y) {
+    if (!terrActive()) return null;
+    for (const z of [10, 8]) {
+      const gx0 = xPx(x, z), gy0 = yPx(y, z), tx = Math.floor(gx0 / 256), ty = Math.floor(gy0 / 256), t = terrData.get(`${z}/${tx}/${ty}`);
+      if (!t || !t.g) continue;
+      const fx = (gx0 - tx * 256) / 2, fy = (gy0 - ty * 256) / 2, i0 = Math.min(127, fx | 0), j0 = Math.min(127, fy | 0), u = fx - i0, v = fy - j0;
+      return gh(t, i0, j0) * (1 - u) * (1 - v) + gh(t, i0 + 1, j0) * u * (1 - v) + gh(t, i0, j0 + 1) * (1 - u) * v + gh(t, i0 + 1, j0 + 1) * u * v;
+    }
+    return null;
+  }
+  // 見る人の地面の高さ（m、平地は 0）と、描くときの高さ（沈むぶんを引いて倍率をかける）
+  const obsElev = (x, y) => { const h = terrElev(x, y); return h != null && h >= TERR_LOW ? h : 0; };
+  const groundZ = (x, y) => { const h = obsElev(x, y); return h ? (h - dropAt(x, y)) * state.exagH : 0; };
+  function terrLayers() {
+    terrKey = '';
+    if (!terrActive()) return [];
+    if (!terr8) { terr8 = far.terr[8]; terr10 = new Set(far.terr[10]); }
+    // 見ている場所が 8km 以上動いたら、沈むぶんを測る基準を移して作り直す
+    const [cx, cy] = current.target;
+    if (!terrRef || Math.hypot(cx - terrRef[0], cy - terrRef[1]) > 8000) terrRef = [cx, cy];
+    const mk = terrRef.map(Math.round).join(',') + '|' + state.exagH;
+    const keys = [];
+    for (const k8 of terr8) {
+      const [x, y] = k8.split('/').map(Number);
+      const x0 = pxX(x * 256, 8), x1 = pxX((x + 1) * 256, 8), y0 = pxY((y + 1) * 256, 8), y1 = pxY(y * 256, 8);
+      const d = Math.hypot(Math.max(x0 - cx, 0, cx - x1), Math.max(y0 - cy, 0, cy - y1));
+      if (d < 30000 && current.zoom > -4.5) {
+        for (let dx = 0; dx < 4; dx++) for (let dy = 0; dy < 4; dy++) { const k10 = `${x * 4 + dx}/${y * 4 + dy}`; if (terr10.has(k10)) keys.push('10/' + k10); }
+      } else keys.push('8/' + k8);
+    }
+    terrKey = keys.join(',') + '|' + mk;
+    const out = [];
+    for (const k of keys) {
+      const t = terrLoad(k);
+      if (!t.g) continue;
+      if (t.meshKey !== mk) { t.mesh = terrMesh(t); t.meshKey = mk; }
+      out.push(new TerrainMeshLayer({
+        id: 'terr-' + k, data: [t], mesh: t.mesh, texture: terrTex(t, state.see), getPosition: (d) => [d.ox, d.oy, 0], getColor: [255, 255, 255, 255],
+        material: { ambient: 0.55, diffuse: 0.65, shininess: 4, specularColor: [20, 20, 20] }, textureParameters: { minFilter: 'linear', magFilter: 'linear' },
+        updateTriggers: { getPosition: [mk] },
+      }));
+    }
+    return out;
+  }
+  document.getElementById('seeTerr').addEventListener('change', (e) => { terrOn = e.target.checked; redraw(); reground(); });
+  // 地形が届いたあとなどに、視点の中心を地形の高さへ乗せ直す（地形を読む前に決めた高さ 0m のままだと、カメラが山の下に入る）
+  let regroundTimer = 0;
+  function reground() {
+    if (regroundTimer) return;
+    regroundTimer = setTimeout(() => {
+      regroundTimer = 0;
+      if (!current || !deckgl || flying) return;
+      if (Date.now() < flyEnd + 50) { reground(); return; }
+      const [tx, ty, tz] = current.target, gz = groundZ(tx, ty);
+      if (Math.abs(gz - (tz || 0)) < 2) return;
+      current = { ...current, target: [tx, ty, gz] };
+      deckgl.setProps({ initialViewState: { ...current, ...LIMITS, transitionDuration: 0 } });
+    }, 200);
+  }
+  window.__terr = { terrElev, groundZ, obsElev, dropAt, terrData, ref: () => terrRef };  // 確認用
 
   // ---- ツアー（紹介動画の撮影用にも）: 見どころを 1 場面ずつ案内する。字幕の帯で前後・一時停止・終了ができる ----
   // 各場面で注目する駅を輪で示し、路線の場面はその路線だけを目立たせる。終わったら・止めたら元の設定に戻す

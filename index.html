@@ -91,6 +91,17 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .caption small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); margin-top: 2px; }
 .caption[hidden] { display: none; }
 @media (max-width: 640px) { .caption { font-size: 16px; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); } }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); margin: 0 -2px; }
+.tabs button { font: inherit; font-size: 13px; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 2px 7px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--lamp); }
+.tabs button:hover { color: var(--fg); }
+.tabs button:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
+.pane { display: grid; gap: 14px; }
+.pane[hidden] { display: none; }
+.about { border-top: 1px solid var(--line); padding-top: 10px; }
+.about summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.about[open] summary { margin-bottom: 8px; }
+.about .note { border-top: 0; padding-top: 6px; }
 .flood { display: grid; gap: 8px; }
 .flood[hidden] { display: none; }
 .legend { display: grid; grid-template-columns: repeat(3, auto); gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
@@ -178,15 +189,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <h1>日本の鉄道立体図</h1>
     <button class="toggle-panel" id="togglePanel" aria-expanded="true">たたむ</button>
   </div>
-  <p class="lede">全国の鉄道を立体で見られます（最初は東京駅のあたり）。半透明の板が地面です。板の下が地下を走る区間、上が高架です。ドラッグで移動、右ドラッグか Shift＋ドラッグで回転・傾け、ホイールで拡大します（スマホは 1 本指で移動、2 本指で拡大・回転）。線に触れると路線名が出ます。</p>
 
   <button class="tourbtn" id="tourBtn">▶ ツアーを再生（約 2 分）</button>
-
-  <div class="group">
-    <span class="label">見どころ</span>
-    <div class="spots" id="spots"></div>
-    <p class="hint" id="spotNote" hidden></p>
-  </div>
 
   <div class="group search">
     <label class="label" for="q">駅を探す</label>
@@ -195,15 +199,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <ul id="qList" class="qlist" role="listbox" aria-label="見つかった駅" hidden></ul>
   </div>
 
-  <div class="group">
-    <span class="label">表示する区間</span>
-    <div class="seg" role="group" aria-label="表示する区間">
-      <button id="modeAll" aria-pressed="true">すべて</button>
-      <button id="modeUnder" aria-pressed="false">地下だけ</button>
-      <button id="modeAbove" aria-pressed="false">地上・高架</button>
-    </div>
+  <div class="picked" id="picked" hidden>
+    <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span></div>
+    <p id="pickedInfo"></p>
+    <div class="profile" id="pickedProfile"></div>
+    <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
   </div>
 
+  <div class="tabs" role="tablist" aria-label="操作盤">
+    <button role="tab" id="tab-look" aria-controls="pane-look" aria-selected="true">見る</button>
+    <button role="tab" id="tab-train" aria-controls="pane-train" aria-selected="false">列車</button>
+    <button role="tab" id="tab-layer" aria-controls="pane-layer" aria-selected="false">重ねる</button>
+    <button role="tab" id="tab-view" aria-controls="pane-view" aria-selected="false">表示</button>
+  </div>
+
+  <section class="pane" id="pane-look" role="tabpanel" aria-labelledby="tab-look">
+  <div class="group">
+    <span class="label">見どころ</span>
+    <div class="spots" id="spots"></div>
+    <p class="hint" id="spotNote" hidden></p>
+  </div>
   <div class="group">
     <span class="label">見る角度</span>
     <div class="views">
@@ -213,30 +228,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       <button id="viewHome" class="wide">最初の位置に戻る</button>
     </div>
   </div>
-
   <div class="group">
-    <span class="label">種類</span>
-    <div class="chips" id="chips"></div>
-  </div>
-
-  <div class="group">
-    <label class="label" for="exag">深さの強調</label>
-    <div class="row">
-      <input type="range" autocomplete="off" id="exag" min="1" max="120" step="1" value="45">
-      <span class="num" id="exagVal">×45</span>
+    <span class="label">表示する区間</span>
+    <div class="seg" role="group" aria-label="表示する区間">
+      <button id="modeAll" aria-pressed="true">すべて</button>
+      <button id="modeUnder" aria-pressed="false">地下だけ</button>
+      <button id="modeAbove" aria-pressed="false">地上・高架</button>
     </div>
   </div>
+  </section>
 
-  <label class="check"><input type="checkbox" autocomplete="off" id="showNames" checked> 駅名を表示</label>
-  <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showMap" checked> 地図を表示</label>
-    <div class="seg seg4" role="group" aria-label="地図の種類" id="mapStyle">
-      <button data-style="std" aria-pressed="true">標準</button>
-      <button data-style="pale" aria-pressed="false">淡色</button>
-      <button data-style="photo" aria-pressed="false">写真</button>
-      <button data-style="dark" aria-pressed="false">暗い</button>
-    </div>
-  </div>
+  <section class="pane" id="pane-train" role="tabpanel" aria-labelledby="tab-train" hidden>
   <div class="group">
     <label class="check"><input type="checkbox" autocomplete="off" id="showTrains"> 走っている列車</label>
     <div class="clock" id="clockBox" hidden>
@@ -253,20 +255,28 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <label class="check"><input type="checkbox" autocomplete="off" id="showInfo"> 運行情報（遅れ・見合わせ）</label>
     <div class="info" id="infoBox" hidden></div>
   </div>
+  </section>
+
+  <section class="pane" id="pane-layer" role="tabpanel" aria-labelledby="tab-layer" hidden>
   <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showUbld"> 地下街（新宿・渋谷・池袋・八重洲・札幌）</label>
-    <p class="hint" id="ubldNote" hidden>PLATEAU の地下街モデルの床を、地下鉄と同じ倍率で重ねています。</p>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showBldg"> ビル（主な都市・31m 以上）</label>
+    <p class="hint" id="bldgLoading" hidden>ビルのデータを読み込んでいます…</p>
+    <p class="hint" id="bldgHint" hidden>ビルの高さも地下の深さと同じ倍率で引き伸ばしています。倍率を ×2 に下げました（地下鉄の深さもそのぶん浅く見えます）。</p>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showPw"> 駅の中（大江戸線 12 駅の通路・階段・エレベーター）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showUbld"> 地下街（新宿・渋谷・池袋ほか）</label>
+    <p class="hint" id="ubldNote" hidden>新宿・渋谷・池袋・八重洲・札幌の地下街の床（PLATEAU）を、地下鉄と同じ倍率で重ねています。</p>
+  </div>
+  <div class="group">
+    <label class="check"><input type="checkbox" autocomplete="off" id="showPw"> 駅の中（大江戸線 12 駅）</label>
     <div class="flood" id="pwBox" hidden>
-      <p class="hint">出入口からホームまでの道のり。いちばん短い道（階段・エスカレーターも使う）と、エレベーターだけで行ける道。階はデータの「地下何階」で、いちばん下（ホーム）をその駅の線路の深さに合わせて描いています。</p>
+      <p class="hint">通路・階段・エスカレーター・エレベーターを立体で。出入口からホームまでの道のり。いちばん短い道（階段・エスカレーターも使う）と、エレベーターだけで行ける道。階はデータの「地下何階」で、いちばん下（ホーム）をその駅の線路の深さに合わせて描いています。</p>
       <div class="legend" id="pwLegend"></div>
       <ol class="rank" id="pwList"></ol>
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showPax"> 駅の利用者数（柱）</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showPax"> 駅の利用者数</label>
     <div class="flood" id="paxBox" hidden>
       <p class="hint">1 日の乗降人員（各社の最新年度の合計。乗車人員だけの会社は 2 倍した目安）。柱の高さ 1km が 200 万人です。</p>
       <span class="label">利用者の多い駅</span>
@@ -274,7 +284,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     </div>
   </div>
   <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showFlood"> 浸水想定（洪水）を重ねる</label>
+    <label class="check"><input type="checkbox" autocomplete="off" id="showFlood"> 浸水想定（洪水）</label>
     <div class="flood" id="floodBox" hidden>
       <p class="hint">川があふれたときの想定最大の浸水の深さ。駅の上の円柱が水の高さで、地下の深さと同じ倍率です。</p>
       <div class="legend" id="floodLegend"></div>
@@ -282,20 +292,37 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       <ol class="rank" id="floodRank"></ol>
     </div>
   </div>
+  </section>
+
+  <section class="pane" id="pane-view" role="tabpanel" aria-labelledby="tab-view" hidden>
   <div class="group">
-    <label class="check"><input type="checkbox" autocomplete="off" id="showBldg"> ビルを重ねる（主な都市・高さ 31m 以上）</label>
-    <p class="hint" id="bldgLoading" hidden>ビルのデータを読み込んでいます…</p>
-    <p class="hint" id="bldgHint" hidden>ビルの高さも地下の深さと同じ倍率で引き伸ばしています。倍率を ×2 に下げました（地下鉄の深さもそのぶん浅く見えます）。</p>
+    <span class="label">種類</span>
+    <div class="chips" id="chips"></div>
   </div>
-
-  <div class="picked" id="picked" hidden>
-    <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span></div>
-    <p id="pickedInfo"></p>
-    <div class="profile" id="pickedProfile"></div>
-    <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
+  <div class="group">
+    <label class="label" for="exag">深さの強調</label>
+    <div class="row">
+      <input type="range" autocomplete="off" id="exag" min="1" max="120" step="1" value="45">
+      <span class="num" id="exagVal">×45</span>
+    </div>
   </div>
+  <label class="check"><input type="checkbox" autocomplete="off" id="showNames" checked> 駅名を表示</label>
+  <div class="group">
+    <label class="check"><input type="checkbox" autocomplete="off" id="showMap" checked> 地図を表示</label>
+    <div class="seg seg4" role="group" aria-label="地図の種類" id="mapStyle">
+      <button data-style="std" aria-pressed="true">標準</button>
+      <button data-style="pale" aria-pressed="false">淡色</button>
+      <button data-style="photo" aria-pressed="false">写真</button>
+      <button data-style="dark" aria-pressed="false">暗い</button>
+    </div>
+  </div>
+  </section>
 
-  <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（標準地図・淡色地図・写真。「暗い」は淡色地図を加工）<br>列車の位置・運行情報: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a><br>地下街: 「3D都市モデル（Project PLATEAU）」地下街モデル（国土交通省、CC BY 4.0）を加工。地面の高さは国土地理院の標高・ジオイド高<br>駅の中: 東京都交通局「都営地下鉄 GTFS-Pathways」（<a href="https://ckan.odpt.org/dataset/train-toei" target="_blank" rel="noopener">公共交通オープンデータセンター</a>、CC BY 4.0）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  <details class="about">
+    <summary>使い方・このページについて</summary>
+    <p class="lede">全国の鉄道を立体で見られます（最初は東京駅のあたり）。半透明の板が地面です。板の下が地下を走る区間、上が高架です。ドラッグで移動、右ドラッグか Shift＋ドラッグで回転・傾け、ホイールで拡大します（スマホは 1 本指で移動、2 本指で拡大・回転）。線に触れると路線名が出ます。</p>
+    <p class="note">深さは路線ごとのおおよその目安です（たとえば大江戸線はいちばん深い 30m 台、銀座線は 10m 弱）。東京以外の地下鉄は一律 15m、そのほかのトンネルは 10m ほどで描いています。駅ごとの実際の深さや、山の中のトンネルの深さとは違います。高さと深さは見やすいように大きく引き伸ばしています。<br>地図データ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>（ODbL）<br>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>（標準地図・淡色地図・写真。「暗い」は淡色地図を加工）<br>列車の位置・運行情報: <a href="https://www.odpt.org/" target="_blank" rel="noopener">公共交通オープンデータセンター</a><br>地下街: 「3D都市モデル（Project PLATEAU）」地下街モデル（国土交通省、CC BY 4.0）を加工。地面の高さは国土地理院の標高・ジオイド高<br>駅の中: 東京都交通局「都営地下鉄 GTFS-Pathways」（<a href="https://ckan.odpt.org/dataset/train-toei" target="_blank" rel="noopener">公共交通オープンデータセンター</a>、CC BY 4.0）<br>浸水想定: <a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水浸水想定区域・想定最大規模）。駅の浸水の深さはタイルの色から読み取った段階です<br>ビル: 「3D都市モデル（Project PLATEAU）」（国土交通省、<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>）を加工</p>
+  </details>
 </aside>
 <div class="tip" id="tip" hidden></div>
 <div class="mapctl" role="group" aria-label="地図の操作">
@@ -321,7 +348,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muq4513g').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muq8fp7p').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -351,7 +378,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq4513g').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq8fp7p').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -359,7 +386,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muq4513g').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muq8fp7p').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -909,12 +936,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq4513g').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq8fp7p').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muq4513g`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muq8fp7p`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -933,7 +960,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muq4513g').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muq8fp7p').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1344,7 +1371,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq4513g').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq8fp7p').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1425,7 +1452,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq4513g').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muq8fp7p').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1492,7 +1519,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muq4513g`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muq8fp7p`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1634,6 +1661,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     tp.textContent = c ? 'ひらく' : 'たたむ'; tp.setAttribute('aria-expanded', String(!c));
   });
   if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
+
+  // ---- 操作盤のタブ（見る・列車・重ねる・表示）。最後に開いたタブを覚える ----
+  const TABS = ['look', 'train', 'layer', 'view'];
+  function showTab(name) {
+    for (const t of TABS) {
+      document.getElementById('tab-' + t).setAttribute('aria-selected', String(t === name));
+      document.getElementById('pane-' + t).hidden = t !== name;
+    }
+    try { localStorage.setItem('rail3d-tab', name); } catch (e) { /* 覚えられないときはそのまま */ }
+  }
+  for (const t of TABS) document.getElementById('tab-' + t).addEventListener('click', () => showTab(t));
+  document.querySelector('.tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = TABS.findIndex((t) => document.getElementById('tab-' + t).getAttribute('aria-selected') === 'true');
+    const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(n); document.getElementById('tab-' + n).focus();
+  });
+  try { const t = localStorage.getItem('rail3d-tab'); if (TABS.includes(t)) showTab(t); } catch (e) { /* そのまま */ }
 
   // ---- 操作盤の設定を覚える（このブラウザの localStorage。使えないときは覚えないだけ） ----
   const SAVE_KEY = 'rail3d-settings-v1';

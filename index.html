@@ -448,7 +448,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqjkgjs').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqksd3d').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -478,7 +478,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqjkgjs').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqksd3d').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -486,7 +486,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqjkgjs').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqksd3d').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -1007,7 +1007,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       onError: (err, layer) => { console.error(err); toast(`描画エラー${layer ? '（' + layer.id + '）' : ''}: ${String(err && err.message || err).slice(0, 120)}`); },
       getCursor: ({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab'),
       onViewStateChange: ({ viewState: vs0 }) => {
-        const viewState = flying ? vs0 : onGround(vs0);
+        // fly で動いているあいだは手を加えない（中心の高さを変えて返すと、deck.gl が操作されたとみなして動きを止める）
+        const viewState = flying || flyMoving ? vs0 : onGround(vs0);
         current = viewState;
         saveHash(viewState);
         setNeedle(viewState.rotationOrbit);
@@ -1144,12 +1145,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqjkgjs').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqksd3d').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqjkgjs`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqksd3d`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1169,7 +1170,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqjkgjs').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqksd3d').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1689,7 +1690,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqjkgjs').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqksd3d').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1770,7 +1771,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqjkgjs').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqksd3d').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1837,7 +1838,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqjkgjs`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqksd3d`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1897,12 +1898,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 
   // ---- 地図の操作ボタン（拡大・縮小・現在地・全体） ----
   // fly で動いているあいだ（終わるか、ほかの操作で止まるまで）は、視点を地面に乗せ直さない。画面が重いと動きは ms より長くかかる
-  let flyMoving = false;
+  // 新しい fly を始めると前の動きは止まり、その「止まった」の知らせも来るので、いちばん新しい fly の知らせだけを使う
+  // （前の知らせで地面に乗せ直すと、新しい動きまで止めてしまい、「ここから〇〇の方を見る」で向きが変わらなかった）
+  let flyMoving = false, flyGen = 0;
   function fly(v, ms) {
     const nv = { ...current, ...v };
-    const dur = reduceMotion ? 0 : ms;
+    // 行き先の中心は地形の高さに（動いているあいだは乗せ直さないので）。向きは近い回り方で
+    if (v.target && typeof groundZ === 'function') nv.target = [v.target[0], v.target[1], groundZ(v.target[0], v.target[1])];
+    if (typeof v.rotationOrbit === 'number') nv.rotationOrbit = current.rotationOrbit + ((((v.rotationOrbit - current.rotationOrbit) % 360) + 540) % 360 - 180);
+    const dur = reduceMotion ? 0 : ms, gen = ++flyGen;
     flyMoving = dur > 0;
-    const done = () => { flyMoving = false; if (typeof reground === 'function') reground(); };
+    const done = () => { if (gen !== flyGen) return; flyMoving = false; if (typeof reground === 'function') reground(); };
     deckgl.setProps({ initialViewState: { ...nv, ...LIMITS, transitionDuration: dur, transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom', 'rotationX', 'rotationOrbit']), onTransitionEnd: done, onTransitionInterrupt: done } });
     state.zoom = nv.zoom; redraw();
   }
@@ -2124,8 +2130,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqjkgjs').then((r) => r.json()),
-    fetch('far.json?v=muqjkgjs').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=muqksd3d').then((r) => r.json()),
+    fetch('far.json?v=muqksd3d').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => { views = v; far = f; if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]); return v; }));
   const seeTiles = new Map();
   let seeRedrawTimer = 0;
@@ -2135,7 +2141,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqjkgjs`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=muqksd3d`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2404,13 +2410,74 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     return out;
   }
-  // 届いたタイルは 1 枚ずつ、間をあけて立体にする（1 枚 2,000〜3,000 棟で 0.2〜0.5 秒かかり、まとめると画面が固まるため）
+  // 建物の立体は、裏の処理（Web Worker）で三角形にして（屋根は earcut、壁は辺ごとに 2 枚）、画面の側は SimpleMeshLayer で描くだけにする
+  // （画面の側で三角形にすると 1 枚 2,000〜3,000 棟で 0.2〜0.5 秒止まり、建物が多いと固まった）。Worker が使えないときは画面の側で、1 枚ずつ間をあけて
+  const BLDG_WORKER = `
+importScripts('https://unpkg.com/earcut@2.2.4/dist/earcut.min.js');
+onmessage = (e) => {
+  const { k, tx, ty, arr, RK, LAM0, MY0 } = e.data, N = 2 ** 23;
+  const X = (g) => (g * 2 * Math.PI / N - Math.PI - LAM0) * RK, Y = (g) => (Math.PI - g * 2 * Math.PI / N - MY0) * RK;
+  const ox = X(tx * 256), oy = Y(ty * 256), P = [], Nn = [], C = [], I = [];
+  const col = (h, f) => { const t = Math.min(1, h / 60) ** 0.7; return [(72 + 90 * t) * f / 255, (82 + 90 * t) * f / 255, (100 + 90 * t) * f / 255, 1]; };
+  const area = (r) => { let a = 0; const n = r.length / 2; for (let i = 0, j = n - 1; i < n; j = i++) a += r[j * 2] * r[i * 2 + 1] - r[i * 2] * r[j * 2 + 1]; return a / 2; };
+  for (const [h10, ...rings] of arr) {
+    const h = h10 / 10, polys = [];
+    let cur = null, s0 = 0;
+    for (const fl of rings) {
+      const r = [];
+      for (let q = 0; q < fl.length; q += 2) r.push(X(tx * 256 + fl[q] / 4) - ox, Y(ty * 256 + fl[q + 1] / 4) - oy);
+      const a = area(r), sg = Math.sign(a);
+      // 外側の輪（最初の輪と同じ回り）ごとに 1 つの面。逆回りの輪はその穴
+      if (!cur || sg === s0) { if (!cur) s0 = sg; cur = { rings: [], areas: [] }; polys.push(cur); }
+      cur.rings.push(r); cur.areas.push(a);
+    }
+    for (const pg of polys) {
+      // 屋根（earcut で三角形に）
+      const flat = [], holes = [];
+      pg.rings.forEach((r, ri) => { if (ri) holes.push(flat.length / 2); for (const v of r) flat.push(v); });
+      const tri = earcut(flat, holes.length ? holes : null), base = P.length / 3, cr = col(h, 1.1);
+      for (let i = 0; i < flat.length; i += 2) { P.push(flat[i], flat[i + 1], h); Nn.push(0, 0, 1); C.push(cr[0], cr[1], cr[2], 1); }
+      for (const t of tri) I.push(base + t);
+      // 壁（辺ごとに 2 枚の三角形。法線は建物の外へ。穴の輪は穴の内側へ）
+      const cw = col(h, 1);
+      pg.rings.forEach((r, ri) => {
+        const n = r.length / 2, ccw = pg.areas[ri] > 0, out = ri === 0 ? (ccw ? 1 : -1) : (ccw ? -1 : 1);
+        for (let i = 0; i < n; i++) {
+          const j = (i + 1) % n, x0 = r[i * 2], y0 = r[i * 2 + 1], x1 = r[j * 2], y1 = r[j * 2 + 1], dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+          if (L < 0.01) continue;
+          const nx = dy / L * out, ny = -dx / L * out, b = P.length / 3;
+          P.push(x0, y0, 0, x1, y1, 0, x1, y1, h, x0, y0, h);
+          for (let q = 0; q < 4; q++) { Nn.push(nx, ny, 0); C.push(cw[0], cw[1], cw[2], 1); }
+          I.push(b, b + 1, b + 2, b, b + 2, b + 3);
+        }
+      });
+    }
+  }
+  const pos = new Float32Array(P), nrm = new Float32Array(Nn), colA = new Float32Array(C), idx = new Uint32Array(I);
+  postMessage({ k, o: [ox, oy], pos, nrm, col: colA, idx }, [pos.buffer, nrm.buffer, colA.buffer, idx.buffer]);
+};
+`;
+  let bldgWorker = null;
+  try {
+    bldgWorker = new Worker(URL.createObjectURL(new Blob([BLDG_WORKER], { type: 'text/javascript' })));
+    bldgWorker.onmessage = (e) => {
+      const d = e.data;
+      if (!allB.has(d.k)) return;
+      allB.set(d.k, { o: d.o, mesh: { attributes: { POSITION: { value: d.pos, size: 3 }, NORMAL: { value: d.nrm, size: 3 }, COLOR_0: { value: d.col, size: 4 }, TEXCOORD_0: { value: new Float32Array(d.pos.length / 3 * 2), size: 2 } }, indices: { value: d.idx, size: 1 } } });
+      redraw();
+    };
+    bldgWorker.onerror = () => { bldgWorker = null; };
+  } catch (e) { bldgWorker = null; }
   const allBQueue = [];
   let allBTimer = 0;
   function allBNext() {
+    if (bldgWorker) {
+      while (allBQueue.length) { const [k, x, y, arr] = allBQueue.shift(); bldgWorker.postMessage({ k, tx: x, ty: y, arr, RK, LAM0, MY0 }); }
+      return;
+    }
     if (allBTimer || !allBQueue.length) return;
     const [k, x, y, arr] = allBQueue.shift();
-    allB.set(k, decodeB(x, y, arr));
+    allB.set(k, { polys: decodeB(x, y, arr) });
     redraw();
     allBTimer = setTimeout(() => { allBTimer = 0; allBNext(); }, 350);
   }
@@ -2434,17 +2501,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqjkgjs`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=muqksd3d`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
     // 読み終えたタイルを最近使った順に。多すぎる古いものは捨てる
     const loaded = [...allB.entries()].filter((e) => e[1]).sort((a, b) => (allBUse.get(b[0]) || 0) - (allBUse.get(a[0]) || 0));
     for (const [k] of loaded.slice(ALLB_KEEP)) { allB.delete(k); allBUse.delete(k); }
-    return loaded.slice(0, ALLB_KEEP).map(([k, data]) => new deck.SolidPolygonLayer({
-      id: 'bldg-all-' + k, data, visible: near, getPolygon: (d) => d.rings, extruded: true, getElevation: (d) => d.h * hr(), updateTriggers: { getElevation: [hr()] },
-      getFillColor: allBColor, modelMatrix: modelMatrix(), pickable: near, material: { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [40, 40, 40] },
-    }));
+    const mat = { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [40, 40, 40] };
+    return loaded.slice(0, ALLB_KEEP).map(([k, v]) => (v.mesh
+      ? new deck.SimpleMeshLayer({
+        id: 'bldg-all-' + k, data: [v], mesh: v.mesh, visible: near, pickable: near, getPosition: (d) => [d.o[0], d.o[1], 0], getScale: [1, 1, state.exagH],
+        getColor: [255, 255, 255, 255], updateTriggers: { getScale: [state.exagH] }, material: mat,
+      })
+      : new deck.SolidPolygonLayer({
+        id: 'bldg-all-' + k, data: v.polys, visible: near, getPolygon: (d) => d.rings, extruded: true, getElevation: (d) => d.h * hr(), updateTriggers: { getElevation: [hr()] },
+        getFillColor: allBColor, modelMatrix: modelMatrix(), pickable: near, material: mat,
+      })));
   }
   // 押した地点から目標の方を、低い角度で見る
   // 見る前の眺め（「上からの眺めに戻る」で戻す）
@@ -2652,7 +2725,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqjkgjs`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=muqksd3d`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

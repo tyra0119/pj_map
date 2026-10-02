@@ -88,9 +88,14 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
   max-width: min(720px, calc(100% - 32px)); text-align: center; padding: 12px 20px; border-radius: 10px;
   background: rgba(10, 15, 21, 0.86); border: 1px solid var(--line); font-size: 20px; font-weight: 700; line-height: 1.5; text-wrap: balance;
 }
-.caption small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+.caption small { display: block; font-size: 14px; font-weight: 400; color: #C8D0DB; margin-top: 4px; line-height: 1.6; }
+.caption .tcap { font-size: 20px; }
+.caption .tbar { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
+.caption .tbar button { font: inherit; font-size: 13px; font-weight: 700; color: var(--fg); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+.caption .tbar button:hover { background: rgba(242, 181, 68, 0.16); }
+.caption .tnum { font-family: var(--font-num); font-size: 12.5px; color: var(--muted); min-width: 4em; }
 .caption[hidden] { display: none; }
-@media (max-width: 640px) { .caption { font-size: 16px; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 640px) { .caption { font-size: 16px; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); } .caption .tcap { font-size: 17px; } .caption small { font-size: 13px; } }
 .tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); margin: 0 -2px; }
 .tabs button { font: inherit; font-size: 13px; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 2px 7px; cursor: pointer; }
 .tabs button[aria-selected="true"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--lamp); }
@@ -350,7 +355,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muq99f8y').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqa8hmu').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -380,7 +385,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muq99f8y').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqa8hmu').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -388,7 +393,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muq99f8y').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqa8hmu').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -1008,12 +1013,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muq99f8y').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqa8hmu').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muq99f8y`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqa8hmu`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1032,7 +1037,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let pwData = null, pwEdges = [];
   async function loadPw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muq99f8y').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqa8hmu').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1443,7 +1448,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq99f8y').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqa8hmu').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1524,7 +1529,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muq99f8y').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqa8hmu').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1591,7 +1596,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muq99f8y`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqa8hmu`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1793,78 +1798,104 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }
     } finally { restoring = false; }
   }
-  // ---- ツアー（紹介動画の撮影用にも）: 見どころを順に回り、字幕を出す。終わったら・止めたら元の設定に戻す ----
-  let touring = false, tourToken = 0, tourSaved = null, orbitRaf = 0;
+  // ---- ツアー（紹介動画の撮影用にも）: 見どころを 1 場面ずつ案内する。字幕の帯で前後・一時停止・終了ができる ----
+  // 各場面で注目する駅を輪で示し、路線の場面はその路線だけを目立たせる。終わったら・止めたら元の設定に戻す
+  let touring = false, tourSaved = null, orbitRaf = 0, tourIdx = 0, tourTimer = 0, tourPaused = false;
   const caption = document.getElementById('caption'), tourBtn = document.getElementById('tourBtn');
-  const wait = (ms, tok) => new Promise((res) => setTimeout(() => res(tok === tourToken), ms));
-  const setCaption = (main, sub) => { caption.innerHTML = '<span></span>' + (sub ? '<small></small>' : ''); caption.children[0].textContent = main; if (sub) caption.children[1].textContent = sub; caption.hidden = false; };
   const setCheck = (id, on) => { const el = document.getElementById(id); if (el.checked !== on) { el.checked = on; el.dispatchEvent(new Event('change')); } };
   // ゆっくり回して見せる
   function slowOrbit(deg, ms) {
     cancelAnimationFrame(orbitRaf);
     const t0 = performance.now(), o0 = current.rotationOrbit;
     const step = (t) => {
-      if (!touring || flying) return;
+      if (!touring || flying || tourPaused) return;
       const f = Math.min(1, (t - t0) / ms);
       current = { ...current, rotationOrbit: o0 + deg * f };
       setNeedle(current.rotationOrbit);
       deckgl.setProps({ initialViewState: { ...current, ...LIMITS, transitionDuration: 0 } });
+      scheduleRefresh();
       if (f < 1) orbitRaf = requestAnimationFrame(step);
     };
     orbitRaf = requestAnimationFrame(step);
   }
   const at = (lon, lat, zoom, orbit, tilt) => ({ target: fromLonLat(lon, lat), zoom, rotationOrbit: orbit, rotationX: tilt });
+  // on: その場面で入れる表示（ほかは切る）。ring: 輪で示す駅。line: 目立たせる路線
   const TOUR = [
-    { cap: '日本の鉄道立体図', sub: '全国の鉄道を、地上・高架・地下まで立体で', fit: true, hold: 5000 },
-    { cap: '東京駅の地下', sub: '総武快速線・京葉線のホームは深く、丸ノ内線は浅いところを通る', view: at(139.7671, 35.6812, -1.4, -40, -16), hold: 7000 },
-    { cap: 'いま走っている列車', sub: 'ODPT の列車の位置と時刻表から。地下を走る電車は地下に', set: { showTrains: true }, view: at(139.745, 35.685, -2.3, -25, 30), hold: 8000 },
-    { cap: '大江戸線を列車の目線で', sub: 'いちばん深い地下鉄の中を進む', fly: '都営大江戸線', hold: 16000 },
-    { cap: '六本木駅の中', sub: '地上から地下 7 階のホームまで。階段・エスカレーター・エレベーター（GTFS-Pathways）', set: { showTrains: false, showPw: true }, view: at(139.7313, 35.6641, 0.3, -30, 22), hold: 8000 },
-    { cap: '都庁と都庁前駅', sub: '高さ 243m の都庁と地下 30m 台の大江戸線を、同じ倍率で（PLATEAU）', set: { showPw: false, showBldg: true }, view: at(139.6917, 35.6896, -1.0, -30, 16), hold: 8000 },
-    { cap: '新宿の地下街', sub: '駅の東西に広がる地下街の床（PLATEAU 地下街モデル）', set: { showBldg: false, showUbld: true }, view: at(139.7005, 35.6905, 0.0, -30, 32), hold: 8000 },
-    { cap: '北千住と浸水想定', sub: '想定最大の洪水で 5〜10m 浸かる区域に、地下 20m 前後のホーム', set: { showUbld: false, showFlood: true }, view: at(139.8045, 35.7495, -1.6, -25, 22), hold: 8000 },
-    { cap: '駅の利用者数', sub: '1 日の乗降人員を柱で（ODPT の乗降人員、14 社）', set: { showFlood: false, showPax: true }, view: at(139.73, 35.69, -3.2, -20, 34), hold: 8000 },
-    { cap: '大阪・梅田', sub: '全国どこでも。地下鉄とビルの街', set: { showPax: false }, view: at(135.4985, 34.7020, -1.6, -20, 26), hold: 7000 },
-    { cap: '日本の鉄道立体図', sub: 'https://tyra0119.github.io/pj_map/', fit: true, hold: 6000 },
+    { cap: '日本の鉄道立体図', sub: '全国の鉄道を、地上・高架・地下まで立体で見られます。これから見どころを順に案内します（下のボタンで前後・一時停止）。', fit: true },
+    { cap: '東京駅の地下', sub: '地図（地面）より下に伸びる線が、地下を走る路線です。東京駅の地下には何本もの路線が重なっています。', view: at(139.7671, 35.6812, -1.6, -35, 34), ring: '東京' },
+    { cap: 'いま走っている列車', sub: '線路の上の小さな車両が列車です。地下の列車は細い縦線で地面とつながっています（ODPT の位置と時刻表から）。', on: ['showTrains'], view: at(139.745, 35.685, -2.2, -25, 32), ring: '東京' },
+    { cap: '大江戸線を列車の目線で', sub: '地下 30m 台を走る、いちばん深い地下鉄の中を進みます。', on: ['showTrains'], fly: '都営大江戸線', hold: 15000 },
+    { cap: '六本木駅の中', sub: '地上から地下 7 階のホームまで。水色の線がエレベーター、オレンジが階段、黄色がエスカレーターです。', on: ['showPw'], view: at(139.7313, 35.6641, 0.2, -30, 30), ring: '六本木' },
+    { cap: '都庁と都庁前駅', sub: '白い柱がビルです。高さ 243m の都庁と、地下の大江戸線を同じ倍率で比べると、地下鉄は意外と浅く見えます。', on: ['showBldg'], view: at(139.6917, 35.6896, -1.0, -30, 18), ring: '都庁前', line: '都営大江戸線' },
+    { cap: '新宿の地下街', sub: 'オレンジ色の面が地下街の床です。駅の東口と西口に広がっています（PLATEAU 地下街モデル）。', on: ['showUbld'], view: at(139.7005, 35.6905, -0.2, -30, 36), ring: '新宿' },
+    { cap: '北千住と浸水想定', sub: '赤っぽい色の区域が、川があふれたときに 5〜10m 浸かる想定の場所。駅の上の円柱が水の高さです。', on: ['showFlood'], view: at(139.8045, 35.7495, -1.6, -25, 28), ring: '北千住' },
+    { cap: '駅の利用者数', sub: '柱が高いほど、1 日に乗り降りする人が多い駅です。渋谷・新宿・池袋がとびぬけています。', on: ['showPax'], view: at(139.73, 35.69, -3.0, -20, 36), ring: '新宿' },
+    { cap: '大阪・梅田', sub: '東京だけでなく全国どこでも。梅田の地下には御堂筋線・四つ橋線・谷町線が通ります。', view: at(135.4985, 34.7020, -1.6, -20, 30), ring: '梅田' },
+    { cap: '日本の鉄道立体図', sub: '左のメニューから、見どころ・列車・重ねる情報を自由に選べます。https://tyra0119.github.io/pj_map/', fit: true },
   ];
-  async function playTour() {
-    const tok = ++tourToken;
-    touring = true; tourSaved = currentSettings();
+  const LAYER_CHECKS = ['showTrains', 'showPw', 'showBldg', 'showUbld', 'showFlood', 'showPax', 'showInfo'];
+  function renderCaption() {
+    const st = TOUR[tourIdx];
+    caption.innerHTML = `<div class="tbar"><button id="tPrev" aria-label="前の場面">◀</button><span class="tnum">${tourIdx + 1} / ${TOUR.length}</span>`
+      + `<button id="tPause" aria-label="${tourPaused ? '再生' : '一時停止'}">${tourPaused ? '▶ 再生' : '❚❚ 一時停止'}</button><button id="tNext" aria-label="次の場面">▶</button><button id="tEnd" aria-label="ツアーを終える">✕</button></div>`
+      + '<div class="tcap"></div><small></small>';
+    caption.querySelector('.tcap').textContent = st.cap;
+    caption.querySelector('small').textContent = st.sub;
+    caption.hidden = false;
+    document.getElementById('tPrev').onclick = () => goStep(tourIdx - 1);
+    document.getElementById('tNext').onclick = () => goStep(tourIdx + 1);
+    document.getElementById('tEnd').onclick = endTour;
+    document.getElementById('tPause').onclick = () => { tourPaused = !tourPaused; if (tourPaused) { clearTimeout(tourTimer); cancelAnimationFrame(orbitRaf); } else scheduleNext(TOUR[tourIdx]); renderCaption(); };
+  }
+  function scheduleNext(st) {
+    clearTimeout(tourTimer);
+    if (tourPaused) return;
+    const hold = st.hold || 10000;
+    if (!st.fit && !st.fly) setTimeout(() => { if (touring && !tourPaused && TOUR[tourIdx] === st) slowOrbit(20, hold - 2400); }, 2400);
+    tourTimer = setTimeout(() => goStep(tourIdx + 1), hold);
+  }
+  function goStep(i) {
+    if (!touring) return;
+    if (i < 0) i = 0;
+    if (i >= TOUR.length) { endTour(); return; }
+    clearTimeout(tourTimer); cancelAnimationFrame(orbitRaf);
+    if (flying) stopFly();
+    tourIdx = i;
+    const st = TOUR[i];
+    // その場面の表示だけを入れる
+    for (const id of LAYER_CHECKS) setCheck(id, (st.on || []).includes(id));
+    // 注目する路線と駅
+    const li = st.line || st.fly ? lines.findIndex((l) => l.name === (st.line || st.fly)) : -1;
+    pick(li >= 0 ? li : null);
+    state.found = st.ring ? stations.filter((s) => s.name === st.ring).sort((a, b) => b.lines.length - a.lines.length)[0] || null : null;
+    renderCaption();
+    if (st.fit) document.getElementById('fitAll').click();
+    else if (st.view) fly(st.view, 2200);
+    else redraw();
+    if (st.fly && li >= 0) flyLine(li);
+    scheduleNext(st);
+  }
+  function playTour() {
+    touring = true; tourPaused = false; tourSaved = currentSettings();
     tourBtn.textContent = '■ ツアーを止める';
     if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
     // 見やすい初期状態（すべての区間・すべての種類・×45・標準地図）
-    applySettings({ mode: 'all', kinds: KINDS.map((k) => k.key), exag: 45, mapStyle: 'std', names: true, map: true, trains: false, info: false, flood: false, pax: false, pw: false, ubld: false, bldg: false });
-    for (const step of TOUR) {
-      if (tok !== tourToken) return;
-      setCaption(step.cap, step.sub);
-      for (const [id, on] of Object.entries(step.set || {})) setCheck(id, on);
-      if (step.fit) document.getElementById('fitAll').click();
-      if (step.view) fly(step.view, 2200);
-      if (step.fly) {
-        const li = lines.findIndex((l) => l.name === step.fly);
-        if (li >= 0) { pick(li); flyLine(li); }
-        if (!await wait(step.hold, tok)) return;
-        stopFly(); pick(null);
-        continue;
-      }
-      if (!await wait(2300, tok)) return;
-      if (!step.fit) slowOrbit(25, step.hold - 2300);
-      if (!await wait(step.hold - 2300, tok)) return;
-    }
-    endTour();
+    applySettings({ mode: 'all', kinds: KINDS.map((k) => k.key), exag: 45, mapStyle: 'std', names: true, map: true, trains: false, info: false, flood: false, pax: false, pw: false, ubld: false, bldg: false, simple: state.simple });
+    goStep(0);
   }
   function endTour() {
-    tourToken++;
     if (!touring) return;
-    cancelAnimationFrame(orbitRaf);
-    stopFly();
+    clearTimeout(tourTimer); cancelAnimationFrame(orbitRaf);
+    if (flying) stopFly();
     caption.hidden = true;
     tourBtn.textContent = '▶ ツアーを再生（約 2 分）';
     touring = false;
+    state.found = null; pick(null);
     applySettings(tourSaved);
   }
   tourBtn.addEventListener('click', () => (touring ? endTour() : playTour()));
-  document.getElementById('map').addEventListener('pointerdown', () => { if (touring) endTour(); });
+  // 地図に触ったら一時停止（自分で動かして見られるように）。続きは字幕の帯の ▶ 再生で
+  document.getElementById('map').addEventListener('pointerdown', () => { if (touring && !tourPaused) { tourPaused = true; clearTimeout(tourTimer); cancelAnimationFrame(orbitRaf); if (flying) stopFly(); renderCaption(); } });
 
   // 操作盤で何か変えたら覚える（変更の処理が終わってから）
   for (const ev of ['change', 'click', 'input']) document.getElementById('panel').addEventListener(ev, () => setTimeout(saveSettings, 0));

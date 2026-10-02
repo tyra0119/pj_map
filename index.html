@@ -60,10 +60,18 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .picked .row { gap: 14px; }
 .stopfly {
   position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6;
-  font: inherit; font-size: 14px; font-weight: 700; color: #1A1204; background: var(--lamp); border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(10, 15, 21, 0.86); border: 1px solid var(--line);
 }
+.stopfly button { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--fg); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+.stopfly #stopFly { color: #1A1204; background: var(--lamp); border-color: var(--lamp); }
+.stopfly .flymul { font-family: var(--font-num); font-size: 12px; color: var(--muted); padding: 0 6px 0 2px; }
+.flyrow { display: grid; gap: 6px; }
+.flybtns { display: grid; gap: 4px; }
+.flybtns button { justify-self: stretch !important; text-align: left; border: 1px solid var(--line) !important; border-radius: 7px; padding: 6px 9px !important; color: var(--fg) !important; font-size: 12.5px !important; }
+.flybtns button:hover { background: rgba(242, 181, 68, 0.12) !important; }
+.flyrow .seg button { color: var(--fg); font-size: 11.5px; padding: 5px 2px; justify-self: stretch; }
 .stopfly[hidden] { display: none; }
-@media (max-width: 640px) { .stopfly { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); } }
+@media (max-width: 640px) { .stopfly { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); } .stopfly button { padding: 7px 9px; font-size: 12.5px; } }
 .info { display: grid; gap: 6px; font-size: 12.5px; }
 .info[hidden] { display: none; }
 .info .item { cursor: pointer; line-height: 1.5; border-left: 3px solid var(--lamp); padding-left: 8px; }
@@ -224,7 +232,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     <div class="name"><i id="pickedSwatch"></i><span id="pickedName"></span></div>
     <p id="pickedInfo"></p>
     <div class="profile" id="pickedProfile"></div>
-    <div class="row"><button id="flyLine">この路線を飛ぶ ▶</button><button id="clearPick">選択を外す</button></div>
+    <div class="flyrow">
+      <span class="label">この路線を飛ぶ（向きを選ぶ）</span>
+      <div class="flybtns"><button id="flyFwd"></button><button id="flyRev"></button></div>
+      <div class="seg seg4" id="flySpeed" role="group" aria-label="飛ぶ速さ">
+        <button data-mul="0.5" aria-pressed="false">ゆっくり</button><button data-mul="1" aria-pressed="true">ふつう</button><button data-mul="2" aria-pressed="false">速い</button><button data-mul="4" aria-pressed="false">最速</button>
+      </div>
+    </div>
+    <button id="clearPick">選択を外す</button>
   </div>
 
   <div class="tabs" role="tablist" aria-label="操作盤">
@@ -374,7 +389,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   </button>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-<button class="stopfly" id="stopFly" hidden>■ 飛ぶのをやめる</button>
+<div class="stopfly" id="flyBar" hidden><button id="flySlower" aria-label="遅くする">− 遅く</button><button id="stopFly">■ 飛ぶのをやめる</button><button id="flyFaster" aria-label="速くする">速く ＋</button><span class="flymul" id="flyMulVal">×1</span></div>
 <div class="caption" id="caption" hidden></div>
 
 <script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
@@ -382,7 +397,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqcnw08').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqe3dno').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -412,7 +427,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqcnw08').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqe3dno').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -420,7 +435,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqcnw08').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqe3dno').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -858,6 +873,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const n = segs.filter((s) => s.li === li), u = n.filter((s) => s.under).length;
       document.getElementById('pickedInfo').textContent = `${l.op ? l.op + '。' : ''}${depthText(l)}。線路データ ${n.length} 区間のうち地下 ${u} 区間。`;
       drawProfile(li);
+      // 飛ぶ向きのボタン（道すじの両端に近い駅の名前で）
+      const ends = lineEnds(li), fb = document.getElementById('flyFwd'), rb = document.getElementById('flyRev');
+      fb.textContent = ends ? `▶ ${ends[0]} → ${ends[1]}` : '▶ 飛ぶ';
+      rb.textContent = ends ? `▶ ${ends[1]} → ${ends[0]}` : '▶ 逆向きに飛ぶ';
     }
     redraw();
   }
@@ -1044,12 +1063,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqcnw08').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqe3dno').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqcnw08`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqe3dno`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1069,7 +1088,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqcnw08').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqe3dno').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1188,7 +1207,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 
   // 路線をなぞって飛ぶ: その路線の区間を端でつないだ道すじのうち、いちばん遠い 2 点のあいだをたどる
   let flying = false, flyRaf = 0;
+  // 道すじは路線ごとに一度だけ求めて使い回す
+  const linePathCache = new Map();
   function linePath(li) {
+    if (!linePathCache.has(li)) linePathCache.set(li, linePathRaw(li));
+    return linePathCache.get(li);
+  }
+  // 道すじの両端に近い駅（その路線の駅のうち）の名前
+  function lineEnds(li) {
+    const pts = linePath(li);
+    if (!pts) return null;
+    const near = (p) => { let best = null, bd = Infinity; for (const s of stations) { if (!s.lines.includes(li)) continue; const d = (s.x - p[0]) ** 2 + (s.y - p[1]) ** 2; if (d < bd) { bd = d; best = s; } } return best ? best.name : '端'; };
+    return [near(pts[0]), near(pts[pts.length - 1])];
+  }
+  function linePathRaw(li) {
     const ss = segs.filter((s) => s.li === li);
     const key = (p) => Math.round(p[0] / 5) + ',' + Math.round(p[1] / 5);
     const adj = new Map();
@@ -1234,12 +1266,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   function stopFly() {
     if (!flying) return;
     flying = false; cancelAnimationFrame(flyRaf);
-    document.getElementById('stopFly').hidden = true;
+    document.getElementById('flyBar').hidden = true;
     fly({ target: [current.target[0], current.target[1], 0], rotationX: Math.max(current.rotationX, 20) }, 600);
   }
-  function flyLine(li) {
-    const pts = linePath(li);
+  // 飛ぶ速さの倍率（ゆっくり 0.5・ふつう 1・速い 2・最速 4）。飛んでいる途中でも変えられる
+  let flyMul = 1;
+  const FLY_MULS = [0.5, 1, 2, 4];
+  function setFlyMul(m) {
+    flyMul = m;
+    for (const b of document.querySelectorAll('#flySpeed button')) b.setAttribute('aria-pressed', String(+b.dataset.mul === m));
+    document.getElementById('flyMulVal').textContent = '×' + m;
+  }
+  // rev: 道すじを逆向きにたどる
+  function flyLine(li, rev = false) {
+    let pts = linePath(li);
     if (!pts) return;
+    if (rev) pts = pts.slice().reverse();
     // 50m おきに打ち直す
     const P = [pts[0]];
     for (let i = 1; i < pts.length; i++) {
@@ -1248,17 +1290,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     const total = (P.length - 1) * 50, speed = Math.max(300, total / 90); // m/秒。長い路線は 90 秒ほどで
     flying = true;
-    document.getElementById('stopFly').hidden = false;
+    document.getElementById('flyBar').hidden = false;
+    document.getElementById('flyMulVal').textContent = '×' + flyMul;
     if (window.matchMedia('(max-width: 640px)').matches) { panel.classList.add('collapsed'); tp.textContent = 'ひらく'; tp.setAttribute('aria-expanded', 'false'); }
-    let t0 = null, heading = null;
+    let lastTs = null, sdist = 0, heading = null;
     const angle = (i) => {
       const a = P[Math.max(0, Math.min(P.length - 1, i))], b = P[Math.max(0, Math.min(P.length - 1, i + 8))];
       return Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI;
     };
     const step = (ts) => {
       if (!flying) return;
-      if (t0 === null) t0 = ts;
-      const sdist = (ts - t0) / 1000 * speed, i = Math.floor(sdist / 50);
+      // 速さを途中で変えても位置が飛ばないよう、進んだ距離を足していく
+      if (lastTs !== null) sdist += Math.min(0.1, (ts - lastTs) / 1000) * speed * flyMul;
+      lastTs = ts;
+      const i = Math.floor(sdist / 50);
       if (i >= P.length - 1) { stopFly(); return; }
       const f = sdist / 50 - i, a = P[i], b = P[i + 1];
       const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, z = (a[2] + (b[2] - a[2]) * f) * state.exag;
@@ -1277,6 +1322,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     flyRaf = requestAnimationFrame(step);
   }
   document.getElementById('stopFly').addEventListener('click', stopFly);
+  document.getElementById('flySlower').addEventListener('click', () => setFlyMul(FLY_MULS[Math.max(0, FLY_MULS.indexOf(flyMul) - 1)]));
+  document.getElementById('flyFaster').addEventListener('click', () => setFlyMul(FLY_MULS[Math.min(FLY_MULS.length - 1, FLY_MULS.indexOf(flyMul) + 1)]));
+  for (const b of document.querySelectorAll('#flySpeed button')) b.addEventListener('click', () => setFlyMul(+b.dataset.mul));
   document.getElementById('map').addEventListener('pointerdown', stopFly);
 
   // ---- 走っている列車 ----
@@ -1479,7 +1527,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqcnw08').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqe3dno').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1560,7 +1608,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqcnw08').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqe3dno').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1627,7 +1675,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqcnw08`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqe3dno`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -1763,7 +1811,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     redraw();
   });
   document.getElementById('clearPick').addEventListener('click', () => pick(null));
-  document.getElementById('flyLine').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked); });
+  document.getElementById('flyFwd').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked, false); });
+  document.getElementById('flyRev').addEventListener('click', () => { if (state.picked !== null) flyLine(state.picked, true); });
   const panel = document.getElementById('panel'), tp = document.getElementById('togglePanel');
   tp.addEventListener('click', () => {
     const c = panel.classList.toggle('collapsed');

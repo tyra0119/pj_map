@@ -402,7 +402,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqf4lm8').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=muqfbpyv').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -432,7 +432,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqf4lm8').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqfbpyv').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -440,7 +440,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqf4lm8').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=muqfbpyv').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -891,8 +891,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       drawProfile(li);
       // 飛ぶ向きのボタン（道すじの両端に近い駅の名前で）
       const ends = lineEnds(li), fb = document.getElementById('flyFwd'), rb = document.getElementById('flyRev');
-      fb.textContent = ends ? `▶ ${ends[0]} → ${ends[1]}` : '▶ 飛ぶ';
-      rb.textContent = ends ? `▶ ${ends[1]} → ${ends[0]}` : '▶ 逆向きに飛ぶ';
+      // 環状線は一周（外回り＝時計回り・内回り＝反時計回り）
+      const ring = linePath(li) && linePath(li).ring;
+      fb.textContent = !ends ? '▶ 飛ぶ' : ring ? `▶ ${ends[0]}から一周（${ring === 'cw' ? '外回り' : '内回り'}）` : `▶ ${ends[0]} → ${ends[1]}`;
+      rb.textContent = !ends ? '▶ 逆向きに飛ぶ' : ring ? `▶ ${ends[0]}から一周（${ring === 'cw' ? '内回り' : '外回り'}）` : `▶ ${ends[1]} → ${ends[0]}`;
     }
     redraw();
   }
@@ -1084,12 +1086,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqf4lm8').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqfbpyv').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqf4lm8`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=muqfbpyv`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1109,7 +1111,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqf4lm8').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=muqfbpyv').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1239,7 +1241,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   function lineEnds(li) {
     const pts = linePath(li);
     if (!pts) return null;
-    const near = (p) => { let best = null, bd = Infinity; for (const s of stations) { if (!s.lines.includes(li)) continue; const d = (s.x - p[0]) ** 2 + (s.y - p[1]) ** 2; if (d < bd) { bd = d; best = s; } } return best ? best.name : '端'; };
+    // その路線の駅が 2km 以内に無ければ（駅が別の路線名で登録されている路線など）、どの路線でも 8km 以内でいちばん近い駅
+    const nearIn = (p, own) => { let best = null, bd = Infinity; for (const s of stations) { if (own && !s.lines.includes(li)) continue; const d = (s.x - p[0]) ** 2 + (s.y - p[1]) ** 2; if (d < bd) { bd = d; best = s; } } return bd < (own ? 2000 : 8000) ** 2 ? best : null; };
+    const near = (p) => { const s = nearIn(p, true) || nearIn(p, false); return s ? s.name : '端'; };
     return [near(pts[0]), near(pts[pts.length - 1])];
   }
   function linePathRaw(li) {
@@ -1255,12 +1259,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       add(a, { to: b, s, len, fwd: true }); add(b, { to: a, s, len, fwd: false });
     }
     if (!adj.size) return null;
-    const far = (start) => {
+    const far = (start, g = adj) => {
       const dist = new Map([[start, 0]]), prev = new Map(), todo = [start];
       while (todo.length) {
         todo.sort((p, q) => dist.get(q) - dist.get(p));
         const u = todo.pop();
-        for (const e of adj.get(u) || []) {
+        for (const e of g.get(u) || []) {
           const nd = dist.get(u) + e.len;
           if (!dist.has(e.to) || nd < dist.get(e.to)) { dist.set(e.to, nd); prev.set(e.to, e); todo.push(e.to); }
         }
@@ -1283,21 +1287,56 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     const xy = (k) => k.split(',').map((v) => v * 5);
     const farE = (k) => { const p = xy(k); let b = k, bd = -1; for (const q of comp) { const r = xy(q), d = (p[0] - r[0]) ** 2 + (p[1] - r[1]) ** 2; if (d > bd) { bd = d; b = q; } } return b; };
-    const A = farE(comp[0]), B = farE(A), { prev } = far(A);
-    // B から A へ戻りながら、通った区間を集める（集めたあとで逆順にすると A → B）
-    const route = [];
-    for (let k = B; k !== A;) {
-      const e = prev.get(k);
-      route.push(e);
-      k = [...adj.entries()].find(([kk, es]) => es.includes(e))[0];
+    const A = farE(comp[0]), B = farE(A);
+    // from から to への最短の道の区間を順に（to から from へ戻りながら集めて逆順に）
+    const from = new Map();
+    for (const [k, es] of adj) for (const e of es) from.set(e, k);
+    const walk = (a, b, g) => {
+      const { prev, dist } = far(a, g);
+      if (!dist.has(b)) return null;
+      const r = [];
+      for (let k = b; k !== a; k = from.get(r[r.length - 1])) r.push(prev.get(k));
+      return r.reverse();
+    };
+    const toPts = (route, pts = []) => {
+      for (const e of route) {
+        const p = e.fwd ? e.s.path : e.s.path.slice().reverse();
+        for (const q of pts.length ? p.slice(1) : p) pts.push(q);
+      }
+      return pts;
+    };
+    const route = walk(A, B);
+    const pts = toPts(route);
+    if (pts.length < 2) return null;
+    // 環状線: 行きの区間を除いても B から A へ戻れて、その道が行きの道から離れている（上り線・下り線が並んでいるだけではない）なら一周する
+    const used = new Set(route.map((e) => e.s));
+    const back = walk(B, A, new Map([...adj].map(([k, es]) => [k, es.filter((e) => !used.has(e.s))])));
+    if (back) {
+      const bp = toPts(back), gaps = [];
+      for (let i = 0; i < bp.length; i += Math.max(1, Math.floor(bp.length / 40))) {
+        let m = Infinity;
+        for (const q of pts) m = Math.min(m, (q[0] - bp[i][0]) ** 2 + (q[1] - bp[i][1]) ** 2);
+        gaps.push(Math.sqrt(m));
+      }
+      gaps.sort((a, b) => a - b);
+      if (gaps[gaps.length >> 1] > 300) {
+        let loop = toPts(back, pts.slice());
+        // いちばん多くの路線が集まる駅から回り始める（山手線なら新宿や東京）
+        let hub = null;
+        for (const st of stations) if (st.lines.includes(li) && (!hub || st.lines.length > hub.lines.length)) hub = st;
+        if (hub) {
+          let bi = 0, bd = Infinity;
+          loop.forEach((q, i) => { const d = (q[0] - hub.x) ** 2 + (q[1] - hub.y) ** 2; if (d < bd) { bd = d; bi = i; } });
+          loop = loop.slice(bi).concat(loop.slice(1, bi + 1));
+        }
+        // 向き: 面積の符号（x は東、y は北。正なら反時計回り）
+        let area = 0;
+        for (let i = 1; i < loop.length; i++) area += loop[i - 1][0] * loop[i][1] - loop[i][0] * loop[i - 1][1];
+        loop.ring = area > 0 ? 'ccw' : 'cw';
+        return loop;
+      }
     }
-    route.reverse();
-    const pts = [];
-    for (const e of route) {
-      const p = e.fwd ? e.s.path : e.s.path.slice().reverse();
-      for (const q of pts.length ? p.slice(1) : p) pts.push(q);
-    }
-    return pts.length > 1 ? pts : null;
+    return pts;
   }
   function stopFly() {
     if (!flying) return;
@@ -1592,7 +1631,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqf4lm8').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqfbpyv').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1673,7 +1712,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqf4lm8').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=muqfbpyv').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1740,7 +1779,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqf4lm8`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=muqfbpyv`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {

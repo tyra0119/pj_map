@@ -179,6 +179,15 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .seefloat .backbtn { font: inherit; font-size: 12.5px; color: var(--fg); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; cursor: pointer; }
 .seefloat .sclose { margin-left: auto; font: inherit; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 6px; }
 @media (max-width: 640px) { .seefloat { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; width: auto; } }
+.winnow b { font-size: 13.5px; }
+.winnow .wrow { display: grid; grid-template-columns: 4.6em 1fr; gap: 6px; color: var(--fg); font-size: 12.5px; }
+.winnow .wrow > span:first-child { color: var(--muted); }
+.winnow .wrow .fj { color: #F2DC5A; font-weight: 700; } .winnow .wrow .sea { color: #6CC0FF; font-weight: 700; }
+.winnow .seg { margin-top: 4px; grid-template-columns: repeat(4, 1fr); }
+.winnow .seg button { color: var(--fg); font-size: 12px; padding: 4px 2px; }
+.winnow .seg button[aria-pressed="true"] { color: #1A1204; }
+.winlist { max-height: 300px; }
+.winlist li { margin-bottom: 2px; }
 .seeAt .lookbtn { justify-self: start; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--lamp); background: rgba(242, 181, 68, 0.1); border: 1px solid rgba(242, 181, 68, 0.5); border-radius: 7px; padding: 5px 9px; cursor: pointer; margin-top: 3px; }
 .hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
 .hint[hidden] { display: none; }
@@ -320,8 +329,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   </section>
 
   <section class="pane" id="pane-see" role="tabpanel" aria-labelledby="tab-see" hidden>
-    <p class="hint">建物や山にさえぎられずに、隅田川の花火・スカイツリー・富士山が見える場所を、地図に色で出します。</p>
   <div class="group">
+    <span class="label">車窓ガイド（試し: 東海道線 東京〜静岡）</span>
+    <p class="hint">窓から富士山と海が見える区間を、線路に沿って地形で計算しました。線路の右と左に色の帯で出し、車窓の目線で走れます。</p>
+    <div class="seg" id="winSeg" role="group" aria-label="車窓ガイドの向き">
+      <button data-win="" aria-pressed="true">なし</button><button data-win="down" aria-pressed="false">東京 → 静岡</button><button data-win="up" aria-pressed="false">静岡 → 東京</button>
+    </div>
+    <div class="seebox" id="winBox" hidden>
+      <div class="legend" id="winLegend"></div>
+      <button class="tourbtn" id="winRide">▶ 車窓の目線で走る（約 2 分半）</button>
+      <span class="label">駅と駅のあいだで見えるもの（押すとその区間へ。★はおすすめ）</span>
+      <ol class="rank winlist" id="winList"></ol>
+      <p class="hint">国土地理院の標高（約 125m の格子）だけで計算した目安です。建物・木・防音壁・天気は入れていません。富士山が「遠くに小さく」の区間は、手前の家やビルでさえぎられやすく、見えるのはところどころです。窓の高さは線路の高さ＋2.5m、海は 1.5km 以内の開けた海面（東京湾は入れていません）。</p>
+    </div>
+  </div>
+  <div class="group">
+    <span class="label">ここなら見える</span>
+    <p class="hint">建物や山にさえぎられずに、隅田川の花火・スカイツリー・富士山が見える場所を、地図に色で出します。</p>
         <div class="seg seg4" id="seeSeg" role="group" aria-label="見えるかを調べるもの">
       <button data-see="" aria-pressed="true">なし</button><button data-see="fw" aria-pressed="false">隅田川花火</button><button data-see="st" aria-pressed="false">スカイツリー</button><button data-see="fj" aria-pressed="false">富士山</button>
     </div>
@@ -474,6 +498,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="seeAt seefloat" id="seeAt" hidden aria-live="polite"></div>
+<div class="seeAt seefloat winnow" id="winNow" hidden></div>
 <div class="stopfly" id="flyBar" hidden><button id="flySlower" aria-label="遅くする">− 遅く</button><button id="stopFly">■ 飛ぶのをやめる</button><button id="flyFaster" aria-label="速くする">速く ＋</button><span class="flymul" id="flyMulVal">×1</span></div>
 <div class="caption" id="caption" hidden></div>
 
@@ -482,7 +507,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=muqxepmf').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=murpji75').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -512,7 +537,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=muqxepmf').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=murpji75').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -520,7 +545,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=muqxepmf').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=murpji75').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -587,6 +612,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const segColor = (s) => {
     const c = lines[s.li].rgb;
     if (state.picked !== null && s.li !== state.picked) return [c[0], c[1], c[2], 38];
+    // 車窓ガイドを出しているときは、ほかの路線を薄く（ガイドの路線は白い線と色の帯で描く）
+    if (state.win && state.picked === null) return [c[0], c[1], c[2], 60];
     return [c[0], c[1], c[2], 255];
   };
   // 高さ（z）は modelMatrix で深さの倍率をかける。地上より上（z > 0）はさらに 高さの倍率 ÷ 深さの倍率 をかけて、高さの倍率にする
@@ -747,7 +774,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const stKey = kindKey + '|' + state.picked;
     const under = cached('under', stKey, () => segs.filter((s) => s.under && visibleSeg(s)));
     const above = cached('above', stKey, () => segs.filter((s) => !s.under && visibleSeg(s)));
-    const pickedTrig = [state.picked];
+    const pickedTrig = [state.picked, !!state.win];
     const showStation = (s) => {
       if (!s.lines.some((li) => state.kinds.has(lines[li].kind))) return false;
       // 路線を選んでいるときは、その路線の駅を表示する区間に関係なく全部
@@ -877,6 +904,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       }),
       ...seeMarkLayers(),
       ...safeLayers(),
+      ...winLayers(),
       new deck.TextLayer({
         id: 'names', data: state.names ? labelsFor(st) : [], getPosition: (d) => [d.x, d.y, Math.max(0, d.zmax) * hr()], updateTriggers: { getPosition: [hr()] }, getText: (d) => d.name,
         getSize: (d) => (d.lines.length >= 5 ? 14 : 12), getColor: [236, 240, 245, 235], getPixelOffset: [0, -10],
@@ -1066,7 +1094,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     showGpu();
     // 駅の中のデータは防災カードでも使うので、最初に読んでおく（83KB）
     ensurePw().then(() => { if (state.found) showCard(state.found); });
-    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains, viewBox, labelsFor, stations, cur: () => current };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains, viewBox, labelsFor, stations, cur: () => current, winSections, winRide, win: () => state.win };  // 確認用
   }
 
   // 端末の GPU と WebGL の版、線の描き方（不具合の報告用。「使い方・このページについて」に出す）
@@ -1186,12 +1214,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=muqxepmf').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=murpji75').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=muqxepmf`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=murpji75`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1213,7 +1241,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=muqxepmf').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=murpji75').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1445,6 +1473,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     flying = false; cancelAnimationFrame(flyRaf);
     deckgl.setProps({ controller: CONTROLLER });
     document.getElementById('flyBar').hidden = true;
+    document.getElementById('stopFly').textContent = '■ 飛ぶのをやめる';
+    if (winRiding) { winRiding = false; document.getElementById('winNow').hidden = true; }
     fly({ target: [current.target[0], current.target[1], 0], rotationX: Math.max(current.rotationX, 20) }, 600);
   }
   // 飛んでいるあいだにマウス・指で変えた、列車の目線からのずれ
@@ -1458,17 +1488,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     document.getElementById('flyMulVal').textContent = '×' + m;
   }
   // rev: 道すじを逆向きにたどる
-  function flyLine(li, rev = false) {
-    let pts = linePath(li);
+  // ride: 車窓ガイドで走るとき { pts: 進む順の点, look(進んだ距離 m, 進む向き) → 向くべき向き, z(x, y, 線路の高さ), tilt, zoom, sec }
+  function flyLine(li, rev = false, ride = null) {
+    let pts = ride ? ride.pts : linePath(li);
     if (!pts) return;
-    if (rev) pts = pts.slice().reverse();
+    if (rev && !ride) pts = pts.slice().reverse();
     // 50m おきに打ち直す
     const P = [pts[0]];
     for (let i = 1; i < pts.length; i++) {
       const [x0, y0, z0] = pts[i - 1], [x1, y1, z1] = pts[i], d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(d / 50));
       for (let k = 1; k <= n; k++) P.push([x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, z0 + (z1 - z0) * k / n]);
     }
-    const total = (P.length - 1) * 50, speed = Math.max(300, total / 90); // m/秒。長い路線は 90 秒ほどで
+    const total = (P.length - 1) * 50, speed = ride ? total / ride.sec : Math.max(300, total / 90); // m/秒。長い路線は 90 秒ほどで
     flying = true;
     flyOff.orbit = 0; flyOff.tilt = 0; flyOff.zoom = 0;
     // 飛んでいるあいだは deck.gl の操作を止め、ドラッグとホイールを「列車の目線からのずれ」として自分で受け取る
@@ -1489,12 +1520,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const i = Math.floor(sdist / 50);
       if (i >= P.length - 1) { stopFly(); return; }
       const f = sdist / 50 - i, a = P[i], b = P[i + 1];
-      const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, z0 = a[2] + (b[2] - a[2]) * f, z = z0 * (z0 > 0 ? state.exagH : state.exag);
-      // 向きはなめらかに追いかける（一周の境目に気をつける）
-      const want = angle(i);
+      const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, z0 = a[2] + (b[2] - a[2]) * f, z = ride ? ride.z(x, y, z0) : z0 * (z0 > 0 ? state.exagH : state.exag);
+      // 向きはなめらかに追いかける（一周の境目に気をつける）。車窓ガイドでは、見えるものの方へ
+      const want = ride ? ride.look(sdist, angle(i)) : angle(i);
       if (heading === null) heading = want;
-      heading += ((((want - heading) % 360) + 540) % 360 - 180) * 0.06;
-      const vs = { ...current, target: [x, y, z], rotationOrbit: heading + flyOff.orbit, rotationX: Math.max(-89, Math.min(90, 14 + flyOff.tilt)), zoom: Math.max(-6, Math.min(4, 0.2 + flyOff.zoom)) };
+      heading += ((((want - heading) % 360) + 540) % 360 - 180) * (ride ? 0.035 : 0.06);
+      const vs = { ...current, target: [x, y, z], rotationOrbit: heading + flyOff.orbit, rotationX: Math.max(-89, Math.min(90, (ride ? ride.tilt : 14) + flyOff.tilt)), zoom: Math.max(-6, Math.min(4, (ride ? ride.zoom : 0.2) + flyOff.zoom)) };
       current = vs;
       setNeedle(vs.rotationOrbit);
       deckgl.setProps({ initialViewState: { ...vs, ...LIMITS, transitionDuration: 0 } });
@@ -1734,7 +1765,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqxepmf').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=murpji75').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1815,7 +1846,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=muqxepmf').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=murpji75').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1882,7 +1913,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=muqxepmf`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=murpji75`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2128,7 +2159,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const man = (n) => (n >= 10000 ? `約 ${(n / 10000).toFixed(n >= 100000 ? 0 : 1)} 万人` : `約 ${n.toLocaleString()} 人`);
   // 逃げ先（dist/safe.json。build-safe.mjs が作る）: 洪水のときの指定緊急避難場所（近い 3 か所）と、駅のまわり 300m の浸水の深さより 3m 以上高い建物
   let safeData = null, safeLoading = null;
-  const loadSafe = () => safeLoading || (safeLoading = fetch('safe.json?v=muqxepmf').then((r) => r.json()).catch(() => ({ sh: {}, vb: {} })).then((d) => { safeData = d; if (state.found) showCard(state.found); redraw(); }));
+  const loadSafe = () => safeLoading || (safeLoading = fetch('safe.json?v=murpji75').then((r) => r.json()).catch(() => ({ sh: {}, vb: {} })).then((d) => { safeData = d; if (state.found) showCard(state.found); redraw(); }));
   // 避難場所まで歩く時間（秒）: 道のりは直線の 1.3 倍、歩く速さは雨の中を考えて 1.0m/秒
   const walkSec = (dm) => dm * 1.3 / 1.0;
   const mins = (sec) => Math.max(1, Math.round(sec / 60));
@@ -2198,6 +2229,217 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }));
     return out;
   }
+  // ---- 車窓ガイド（試し）: 路線に沿って、窓から富士山と海が見える区間（window.json。build-window.mjs が地形で求める） ----
+  // 点は 100m ごと。fj: 0 見えない・1 山頂だけ・2 山頂から 1,000m 下まで、fa: 山頂の見上げの角度（0.1 度）、fb: 富士山の方角、
+  // sea: 1 左・2 右（東京 → 静岡の向きで）＋見えた海の番号 × 4、cat: 0 地上・1 トンネル・2 高架
+  let winData = null, winLoading = null, winRiding = false, winLook = 'auto', winNowKey = '';
+  const loadWin = () => winLoading || (winLoading = fetch('window.json?v=murpji75').then((r) => r.json()).then((d) => {
+    for (const r of d.routes) {
+      const P = [];
+      let x = 0, y = 0, z = 0;
+      for (let k = 0; k < r.xyz.length; k += 3) { x += r.xyz[k]; y += r.xyz[k + 1]; z += r.xyz[k + 2]; P.push([x, y, z]); }
+      r.P = P;
+    }
+    return (winData = d);
+  }));
+  const WIN_SIDE = { R: '右の窓', L: '左の窓' };
+  // 富士山の大きさ（山頂の見上げの角度で）。小さいと手前の建物にさえぎられやすい
+  const fujiSize = (fa) => (fa >= 5 ? '大きく' : fa >= 2.5 ? 'よく見える' : '遠くに小さく、建物にさえぎられやすい');
+  // i 番目の点での進む向き（北から時計回りの度）
+  function winHead(r, i, rev) {
+    const P = r.P, a = P[Math.max(0, i - 3)], b = P[Math.min(P.length - 1, i + 3)];
+    return Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + (rev ? 180 : 0);
+  }
+  // i 番目の点で窓から見えるもの（rev: 静岡 → 東京の向き）
+  function winAt(r, i, rev) {
+    const fj = +r.fj[i], s = r.sea[i];
+    // 富士山のある窓（右・左）と、前寄り・後ろ寄り（進む向きから 35 度以内）
+    let fside = null, fpos = '';
+    if (fj) {
+      const rel = ((r.fb[i] - winHead(r, i, rev)) % 360 + 540) % 360 - 180;
+      fside = rel > 0 ? 'R' : 'L';
+      fpos = Math.abs(rel) < 35 ? '前寄り' : Math.abs(rel) > 145 ? '後ろ寄り' : '';
+    }
+    const L = !!(s & 1), R = !!(s & 2);
+    return { fj, fa: r.fa[i] / 10, fside, fpos, sea: rev ? { L: R, R: L } : { L, R }, seaName: s ? winData.seas[s >> 2] : '', tunnel: r.cat[i] === '1' };
+  }
+  // 駅と駅のあいだごとのまとめ（進む順）
+  function winSections(r, rev) {
+    const st = rev ? r.st.slice().reverse() : r.st, out = [];
+    for (let k = 0; k + 1 < st.length; k++) {
+      const [a, ia] = st[k], [b, ib] = st[k + 1], lo = Math.min(ia, ib), hi = Math.max(ia, ib), n = Math.max(1, hi - lo);
+      let f = 0, fam = 0, sl = 0, sr = 0, tun = 0;
+      const side = {}, seaN = {};
+      for (let i = lo; i < hi; i++) {
+        const w = winAt(r, i, rev);
+        if (w.fj) { f++; const k2 = w.fside + w.fpos; side[k2] = (side[k2] || 0) + 1; fam = Math.max(fam, w.fa); }
+        if (w.sea.L) sl++;
+        if (w.sea.R) sr++;
+        if (w.seaName) seaN[w.seaName] = (seaN[w.seaName] || 0) + 1;
+        if (w.tunnel) tun++;
+      }
+      const fs = Object.keys(side).sort((p, q) => side[q] - side[p])[0] || '';
+      const sea = Object.keys(seaN).sort((p, q) => seaN[q] - seaN[p])[0] || '';
+      out.push({ a, b, lo, hi, f: f / n, fam, fside: fs[0], fpos: fs.slice(1), sl: sl / n, sr: sr / n, sea, tun: tun / n });
+    }
+    return out;
+  }
+  const sectionText = (q) => {
+    const t = [];
+    if (q.f >= 0.05) t.push(`富士山: ${WIN_SIDE[q.fside]}${q.fpos ? 'の' + q.fpos : ''}（${fujiSize(q.fam)}${q.f < 0.8 ? '・ところどころ' : ''}）`);
+    const sea = (v, side) => { if (v >= 0.1) t.push(`海: ${side}${q.sea ? '（' + q.sea + (v < 0.5 ? '・ところどころ' : '') + '）' : ''}`); };
+    sea(q.sl, '左の窓'); sea(q.sr, '右の窓');
+    if (q.tun >= 0.5) t.push('トンネルが多い');
+    return t.length ? t.join('　') : '見えない（地形のかげ）';
+  };
+  const sectionStar = (q) => (q.f >= 0.7 && q.fam >= 5) || q.sl >= 0.7 || q.sr >= 0.7;
+  function winPanel() {
+    const box = document.getElementById('winBox');
+    for (const b of document.querySelectorAll('#winSeg button')) b.setAttribute('aria-pressed', String((b.dataset.win || '') === (state.win ? (state.win.rev ? 'up' : 'down') : '')));
+    box.hidden = !state.win;
+    if (!state.win) return;
+    const { r, rev } = state.win;
+    document.getElementById('winLegend').innerHTML = '<span><i style="background:#FFE680"></i>富士山（大きく・よく見える）</span><span><i style="background:rgba(242,220,90,0.45)"></i>富士山（遠くに小さく）</span><span><i style="background:#46AAFF"></i>海</span><span><i style="background:rgba(160,170,185,0.6)"></i>トンネル</span>';
+    document.getElementById('winRide').textContent = `▶ 車窓の目線で走る（${rev ? r.to + ' → ' + r.from : r.from + ' → ' + r.to}、約 2 分半）`;
+    const ol = document.getElementById('winList');
+    ol.innerHTML = '';
+    for (const q of winSections(r, rev)) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span></span><br><span class="sub"></span>';
+      li.children[0].textContent = `${sectionStar(q) ? '★ ' : ''}${q.a} → ${q.b}`;
+      li.children[2].textContent = sectionText(q);
+      li.addEventListener('click', () => winGo(q));
+      ol.appendChild(li);
+    }
+  }
+  // その区間が見えるように: 区間の真ん中を、見えるもの（富士山・海）の方へ向いて斜め上から
+  function winGo(q) {
+    if (winRiding) stopFly();
+    const { r, rev } = state.win, m = Math.round((q.lo + q.hi) / 2), p = r.P[m], head = winHead(r, m, rev);
+    const span = Math.hypot(r.P[q.hi][0] - r.P[q.lo][0], r.P[q.hi][1] - r.P[q.lo][1]);
+    const orbit = q.f >= 0.3 ? r.fb[m] : q.sl >= 0.1 ? head - 90 : q.sr >= 0.1 ? head + 90 : head;
+    const W = document.getElementById('map').clientWidth || 1000;
+    const pad = window.matchMedia('(max-width: 640px)').matches || panel.classList.contains('collapsed') ? 0 : panel.offsetWidth + 24;
+    const zoom = Math.max(-4, Math.min(0.5, Math.log2((W - pad) / (2.2 * Math.max(1500, span))))), sh = pad / 2 / 2 ** zoom, o = orbit * Math.PI / 180;
+    fly({ target: [p[0] - Math.cos(o) * sh, p[1] + Math.sin(o) * sh, 0], rotationOrbit: orbit, rotationX: 22, zoom }, 1600);
+  }
+  async function setWin(kind) {
+    if (winRiding) stopFly();
+    if (!kind) { state.win = null; winPanel(); redraw(); return; }
+    await loadWin();
+    state.win = { r: winData.routes[0], rev: kind === 'up' };
+    winPanel();
+    // 山の形と富士山を出す（「見える」の富士山に）
+    if (state.see !== 'fj') await setSee('fj', false);
+    // 路線の全体を、富士山の方を向いて斜め上から
+    const { r } = state.win, P = r.P;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const q of P) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+    const c = [(x0 + x1) / 2, (y0 + y1) / 2], f = fromLonLat(...winData.fuji), W = document.getElementById('map').clientWidth || 1000;
+    // パソコンでは左の操作盤のぶんをよけて、残りの真ん中に
+    const pad = window.matchMedia('(max-width: 640px)').matches || panel.classList.contains('collapsed') ? 0 : panel.offsetWidth + 24;
+    const orbit = Math.atan2(f[0] - c[0], f[1] - c[1]) * 180 / Math.PI, zoom = Math.log2((W - pad) / (1.2 * Math.hypot(x1 - x0, y1 - y0))), sh = pad / 2 / 2 ** zoom, o = orbit * Math.PI / 180;
+    fly({ target: [c[0] - Math.cos(o) * sh, c[1] + Math.sin(o) * sh, 0], rotationOrbit: orbit, rotationX: 32, zoom }, 1800);
+    redraw();
+  }
+  for (const b of document.querySelectorAll('#winSeg button')) b.addEventListener('click', () => setWin(b.dataset.win));
+  // 走っているときのカード
+  function winCard(r, rev, k) {
+    const st = rev ? r.st.slice().reverse() : r.st;
+    let a = st[0][0], b = st[1] ? st[1][0] : '';
+    for (let j = 0; j + 1 < st.length; j++) if (rev ? k <= st[j][1] : k >= st[j][1]) { a = st[j][0]; b = st[j + 1][0]; }
+    const w = winAt(r, k, rev);
+    const what = (side) => {
+      const t = [];
+      if (w.fj && w.fside === side) t.push(`<span class="fj">富士山</span>（${w.fpos ? w.fpos + '・' : ''}${fujiSize(w.fa)}${w.fj === 2 ? '' : '・山頂のあたりだけ'}）`);
+      if (w.sea[side]) t.push(`<span class="sea">海</span>（${w.seaName}）`);
+      return t.join('・') || '—';
+    };
+    const rows = [['右の窓', what('R')], ['左の窓', what('L')]];
+    if (w.tunnel) rows.push(['', 'トンネルの中']);
+    const html = `<b>${r.name} ${rev ? '上り' : '下り'}</b> <span>${a} → ${b}</span>` + rows.map(([h, v]) => `<div class="wrow"><span>${h}</span><span>${v}</span></div>`).join('');
+    if (html === winNowKey) return;
+    winNowKey = html;
+    document.querySelector('#winNow .wbody').innerHTML = html;
+  }
+  function winRide() {
+    if (!state.win) return;
+    const { r, rev } = state.win;
+    const pts = rev ? r.P.slice().reverse() : r.P, step = winData.step, n = r.P.length;
+    const box = document.getElementById('winNow');
+    box.innerHTML = '<div class="wbody"></div><div class="seg" role="group" aria-label="見る向き"><button data-l="auto">自動</button><button data-l="F">前</button><button data-l="L">左の窓</button><button data-l="R">右の窓</button></div><p class="hint">自動: 富士山か海が見える方を向きます。ドラッグで向きを少し変えられます。</p>';
+    const setLook = (l) => { winLook = l; flyOff.orbit = 0; for (const b of box.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(b.dataset.l === l)); };
+    for (const b of box.querySelectorAll('.seg button')) b.addEventListener('click', () => setLook(b.dataset.l));
+    setLook('auto');
+    winNowKey = '';
+    document.getElementById('seeAt').hidden = true;
+    box.hidden = false;
+    // 進んだ距離から路線の点の番号に
+    const idx = (d) => { const j = Math.max(0, Math.min(n - 1, Math.round(d / step))); return rev ? n - 1 - j : j; };
+    flyLine(null, false, {
+      pts, sec: 150, tilt: 7, zoom: 1.4,
+      z: (x, y, z0) => groundZ(x, y) + (z0 + 3) * state.exagH,
+      look: (d) => {
+        const k = idx(d);
+        winCard(r, rev, k);
+        const head = winHead(r, k, rev);
+        if (winLook === 'F') return head;
+        if (winLook === 'R') return head + 90;
+        if (winLook === 'L') return head - 90;
+        // 自動: 前後 500m ほどで多く見えるもの（ちらつかないように）。富士山 → 海 → 前
+        let f = 0, sl = 0, sr = 0, m = 0;
+        for (let j = -3; j <= 5; j++) {
+          const w = winAt(r, idx(d + j * step), rev);
+          m++;
+          if (w.fj) f++;
+          if (w.sea.L) sl++;
+          if (w.sea.R) sr++;
+        }
+        if (f >= m / 2) return r.fb[k];
+        if (sl >= m / 2 || sr >= m / 2) return head + (sr > sl ? 90 : -90);
+        return head;
+      },
+    });
+    winRiding = true;
+    document.getElementById('stopFly').textContent = '■ 走るのをやめる';
+  }
+  document.getElementById('winRide').addEventListener('click', winRide);
+  // 線路の左右の色の帯（東京 → 静岡の向きで左右を決めるので、向きを変えても同じ帯）と、路線の線（トンネルは薄く）
+  let winRuns = null;
+  function winBuildRuns(r) {
+    const P = r.P, runs = [], open = new Map();
+    for (let i = 0; i < P.length; i++) {
+      const w = winAt(r, i, false), here = [];
+      if (w.fj) here.push(['fj' + (w.fa >= 2.5 ? 'b' : 's'), { side: w.fside, color: w.fa >= 2.5 ? [255, 230, 128, 235] : [242, 220, 90, 120], lane: 1 }]);
+      for (const sd of ['L', 'R']) if (w.sea[sd]) here.push(['sea', { side: sd, color: [70, 170, 255, 230], lane: w.fj && w.fside === sd ? 2 : 1 }]);
+      here.push([w.tunnel ? 'tun' : 'line', { side: '', color: w.tunnel ? [160, 170, 185, 110] : [255, 255, 255, 170], lane: 0 }]);
+      // 種類・側・列が同じものが続くあいだは、ひと続きの線に
+      const seen = new Set();
+      for (const [key, f] of here) {
+        const k2 = key + f.side + f.lane;
+        seen.add(k2);
+        let run = open.get(k2);
+        if (!run) { run = { ...f, path: i > 0 ? [P[i - 1]] : [] }; open.set(k2, run); runs.push(run); }
+        run.path.push(P[i]);
+      }
+      for (const k2 of [...open.keys()]) if (!seen.has(k2)) open.delete(k2);
+    }
+    return runs.filter((q) => q.path.length >= 2);
+  }
+  function winLayers() {
+    if (!state.win) return [];
+    const r = state.win.r;
+    if (!winRuns || winRuns.r !== r) winRuns = { r, runs: winBuildRuns(r) };
+    const gz = (p) => groundZ(p[0], p[1]) + (p[2] + 1.5) * state.exagH;
+    return [new deck.PathLayer({
+      id: 'win-runs', data: winRuns.runs, getPath: (d) => d.path.map((p) => [p[0], p[1], gz(p)]), getColor: (d) => d.color,
+      getWidth: (d) => (d.lane ? 7 : 4), widthUnits: 'pixels', widthMinPixels: 2, capRounded: true, jointRounded: true,
+      // 帯は線路の横にずらす（幅に対する割合。正は進む向きの右）
+      getOffset: (d) => (d.lane ? (d.side === 'R' ? 1 : -1) * (d.lane === 1 ? 0.9 : 1.9) : 0),
+      extensions: [new deck.PathStyleExtension({ offset: true })],
+      updateTriggers: { getPath: [state.exagH, terrKey, terrRefKey] }, parameters: { depthWriteEnabled: false },
+    })];
+  }
   function selectStation(s) { state.found = s; showCard(s); redraw(); }
   // 浸水する区域にある地下駅の一覧（注意度 → 利用者の多さ → 深さの順）
   function buildSafeRank() {
@@ -2251,8 +2493,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=muqxepmf').then((r) => r.json()),
-    fetch('far.json?v=muqxepmf').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=murpji75').then((r) => r.json()),
+    fetch('far.json?v=murpji75').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => {
     views = v; far = f;
     if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]);
@@ -2290,7 +2532,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=muqxepmf`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=murpji75`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2652,7 +2894,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=muqxepmf`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=murpji75`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -2879,7 +3121,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=muqxepmf`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=murpji75`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });

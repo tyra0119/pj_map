@@ -89,7 +89,12 @@ h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; text-
 .flybtns button:hover { background: rgba(242, 181, 68, 0.12) !important; }
 .flyrow .seg button { color: var(--fg); font-size: 11.5px; padding: 5px 2px; justify-self: stretch; }
 .stopfly[hidden] { display: none; }
-@media (max-width: 640px) { .stopfly { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); } .stopfly button { padding: 7px 9px; font-size: 12.5px; } }
+@media (max-width: 640px) {
+  .stopfly { bottom: auto; top: calc(12px + env(safe-area-inset-top, 0px)); flex-wrap: wrap; justify-content: center; max-width: calc(100% - 20px); border-radius: 20px; }
+  .stopfly button { padding: 7px 9px; font-size: 12.5px; }
+  /* 車窓ガイドのカードは、上の飛ぶバーと重ならないよう下に */
+  .seefloat.winnow { top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
 .info { display: grid; gap: 6px; font-size: 12.5px; }
 .info[hidden] { display: none; }
 .info .item { cursor: pointer; line-height: 1.5; border-left: 3px solid var(--lamp); padding-left: 8px; }
@@ -499,7 +504,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="seeAt seefloat" id="seeAt" hidden aria-live="polite"></div>
 <div class="seeAt seefloat winnow" id="winNow" hidden></div>
-<div class="stopfly" id="flyBar" hidden><button id="flySlower" aria-label="遅くする">− 遅く</button><button id="stopFly">■ 飛ぶのをやめる</button><button id="flyFaster" aria-label="速くする">速く ＋</button><span class="flymul" id="flyMulVal">×1</span></div>
+<div class="stopfly" id="flyBar" hidden><button id="flySlower" aria-label="遅くする">− 遅く</button><button id="stopFly">■ 飛ぶのをやめる</button><button id="flyFaster" aria-label="速くする">速く ＋</button><span class="flymul" id="flyMulVal">×1</span><button id="flyView" aria-label="見る高さを切り替える">上空から</button></div>
 <div class="caption" id="caption" hidden></div>
 
 <script src="https://unpkg.com/deck.gl@9.4.0/dist.min.js"></script>
@@ -507,7 +512,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
 (async function () {
   let D;
   try {
-    D = await fetch('rail.json?v=murpji75').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    D = await fetch('rail.json?v=murtcvox').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   } catch (e) {
     document.getElementById('loading').textContent = 'データを読み込めませんでした。再読み込みしてください。';
     return;
@@ -537,7 +542,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadBldg(box) {
     const msg = document.getElementById('bldgLoading');
     try {
-      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=murpji75').then((r) => r.json());
+      if (!bldgIndex) bldgIndex = await fetch('bldg/index.json?v=murtcvox').then((r) => r.json());
     } catch (e) { msg.textContent = 'ビルのデータを読み込めませんでした。'; msg.hidden = false; return; }
     const M = 5000;
     const want = bldgIndex.filter((f) => !bldgLoaded.has(f.f) && (!box || (f.b[0] - M < box[2] && box[0] < f.b[2] + M && f.b[1] - M < box[3] && box[1] < f.b[3] + M)));
@@ -545,7 +550,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       bldgLoaded.add(f.f);
       bldgPending++;
       msg.textContent = `ビルのデータ（${f.name}、約 ${Math.max(0.1, Math.round(f.kb / 100) / 10)}MB）を読み込んでいます…`; msg.hidden = false;
-      fetch('bldg/' + f.f + '?v=murpji75').then((r) => r.json()).then((B) => {
+      fetch('bldg/' + f.f + '?v=murtcvox').then((r) => r.json()).then((B) => {
         bldgs = bldgs.concat(B.bldg.map(([h, ...rings]) => ({ h, rings: rings.map(decRing) })));
         redraw();
       }).catch(() => bldgLoaded.delete(f.f)).finally(() => { if (--bldgPending === 0) msg.hidden = true; });
@@ -692,16 +697,28 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   DarkTileLayer.layerName = 'DarkTileLayer';
   let tileKey = '';
   // 見えている地面の範囲 [x0, y0, x1, y1]（画面の格子点を地面 z=0 に落とす。地平線より上の点は除き、遠くは中心から画面 3 枚ぶんまで）
-  function viewBox() {
+  // mul: 中心からどこまでを入れるか（画面の大きさ÷拡大率の倍数）
+  // ground: 画面の点から地面（高さ 0）へ視線を伸ばして交わる所で求める。ふだんは見ている中心の深さで求める（低い角度では中心の近くしか入らない）。
+  //   遠くの粗いタイル用（線路の上から飛ぶときなど、地平線の方まで地面が映る）
+  function viewBox(mul = 3, ground = false) {
     const el = document.getElementById('map');
     const W = el.clientWidth, H = el.clientHeight;
     if (!W || !current) return null;
     const vp = VIEW.makeViewport({ width: W, height: H, viewState: current });
-    const [tx, ty] = current.target, span = 3 * Math.max(W, H) / 2 ** current.zoom;
+    const [tx, ty] = current.target, span = mul * Math.max(W, H) / 2 ** current.zoom;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
-      const p = vp.unproject([W * i / 6, H * j / 6]);
-      if (!p || !Number.isFinite(p[0]) || !(vp.project([p[0], p[1], 0])[2] < 1)) continue;
+    const nj = ground ? 30 : 6;  // 地面で求めるときは縦を細かく（地平線のすぐ下までが遠くの地面）
+    for (let i = 0; i <= 6; i++) for (let j = 0; j <= nj; j++) {
+      let p;
+      if (ground) {
+        const c = vp.unproject([W * i / 6, H * j / nj, -1]), b = vp.unproject([W * i / 6, H * j / nj, 1]);
+        const k = c && b && c[2] !== b[2] ? c[2] / (c[2] - b[2]) : -1;
+        if (!(k >= 0 && k <= 1)) continue;  // 空の方（地面と交わらない）
+        p = [c[0] + k * (b[0] - c[0]), c[1] + k * (b[1] - c[1])];
+      } else {
+        p = vp.unproject([W * i / 6, H * j / nj]);
+        if (!p || !Number.isFinite(p[0]) || !(vp.project([p[0], p[1], 0])[2] < 1)) continue;
+      }
       const px = Math.min(tx + span, Math.max(tx - span, p[0])), py = Math.min(ty + span, Math.max(ty - span, p[1]));
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     }
@@ -722,9 +739,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let r = range(z);
     while (z > zmin && (r[1] - r[0] + 1) * (r[3] - r[2] + 1) > 48) r = range(--z);
     const out = [];
-    // 読み込み中のすき間を埋めるため、3 段粗いタイルを下に敷く
-    for (const zz of z - 3 >= zmin ? [z - 3, z] : [z]) {
-      const [a, b, c, d, w] = zz === z ? r : range(zz);
+    // 読み込み中のすき間を埋めるため、3 段粗いタイルを下に敷く。粗いタイルは、低い角度で遠く（地平線の方）まで映るときも敷く
+    // （線路の上から飛ぶときなど、細かいタイルの範囲（中心から画面 3 枚分）の外が暗く抜けていた）
+    const far = viewBox(60, true);
+    let zc = z - 3, rc = null;
+    if (zc >= zmin && far) {
+      const rangeF = (zz) => { const w = 2 * WM / 2 ** zz, n = 2 ** zz, ix = (x) => Math.floor((x / K + X0 + WM) / w), iy = (y) => Math.floor((WM - (y / K + Y0)) / w); return [Math.max(0, ix(far[0])), Math.min(n - 1, ix(far[2])), Math.max(0, iy(far[3])), Math.min(n - 1, iy(far[1])), w]; };
+      rc = rangeF(zc);
+      while (zc > zmin && (rc[1] - rc[0] + 1) * (rc[3] - rc[2] + 1) > 32) rc = rangeF(--zc);
+    }
+    for (const zz of rc ? [zc, z] : [z]) {
+      const [a, b, c, d, w] = zz === z ? r : rc;
       for (let ix = a; ix <= b; ix++) for (let iy = c; iy <= d; iy++) {
         const L = (-WM + ix * w - X0) * K, R = (-WM + (ix + 1) * w - X0) * K, T = (WM - iy * w - Y0) * K, B = (WM - (iy + 1) * w - Y0) * K;
         out.push({ id: `${zz}/${ix}/${iy}`, url: url(zz, ix, iy), bounds: [[L, B], [L, T], [R, T], [R, B]] });
@@ -1094,7 +1119,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     showGpu();
     // 駅の中のデータは防災カードでも使うので、最初に読んでおく（83KB）
     ensurePw().then(() => { if (state.found) showCard(state.found); });
-    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains, viewBox, labelsFor, stations, cur: () => current, winSections, winRide, win: () => state.win };  // 確認用
+    window.rail3d = { deck: deckgl, state, pick, flyLine, lines, trains: () => trains, trainMap, tickTrains, loadTrains, viewBox, labelsFor, stations, cur: () => current, winSections, winRide, win: () => state.win, tilesFor, viewBox };  // 確認用
   }
 
   // 端末の GPU と WebGL の版、線の描き方（不具合の報告用。「使い方・このページについて」に出す）
@@ -1214,12 +1239,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   let ubldIndex = null, ubldMeshes = [];
   const ubldLoaded = new Set();
   async function loadUbld(box) {
-    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=murpji75').then((r) => r.json()).catch(() => []);
+    if (!ubldIndex) ubldIndex = await fetch('ubld/index.json?v=murtcvox').then((r) => r.json()).catch(() => []);
     const M = 3000;
     for (const u of ubldIndex) {
       if (ubldLoaded.has(u.f) || (box && !(u.b[0] - M < box[2] && box[0] < u.b[2] + M && u.b[1] - M < box[3] && box[1] < u.b[3] + M))) continue;
       ubldLoaded.add(u.f);
-      fetch(`ubld/${u.f}?v=murpji75`).then((r) => r.arrayBuffer()).then((buf) => {
+      fetch(`ubld/${u.f}?v=murtcvox`).then((r) => r.arrayBuffer()).then((buf) => {
         const a = new Int16Array(buf), P = new Float32Array(a.length), N = new Float32Array(a.length);
         for (let i = 0; i < a.length; i += 3) { P[i] = a[i] / 4; P[i + 1] = a[i + 1] / 4; P[i + 2] = a[i + 2] / 4; N[i + 2] = 1; }
         ubldMeshes = ubldMeshes.concat([{ ...u, mesh: { attributes: { POSITION: { value: P, size: 3 }, NORMAL: { value: N, size: 3 }, TEXCOORD_0: { value: new Float32Array(a.length / 3 * 2), size: 2 } } } }]);
@@ -1241,7 +1266,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   async function loadPw() { await ensurePw(); redraw(); }
   async function ensurePw() {
     if (!pwData) {
-      pwData = await fetch('pathways.json?v=murpji75').then((r) => r.json()).catch(() => []);
+      pwData = await fetch('pathways.json?v=murtcvox').then((r) => r.json()).catch(() => []);
       pwEdges = [];
       for (const st of pwData) {
         const s = stations[st.si];
@@ -1479,6 +1504,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   }
   // 飛んでいるあいだにマウス・指で変えた、列車の目線からのずれ
   const flyOff = { orbit: 0, tilt: 0, zoom: 0 };
+  // 見る高さ: 線路の上（列車の後ろ少し上から、線路の高さの目線。はじめはこちら）と上空から。飛んでいる途中でも変えられる
+  const FLY_VIEWS = { track: { tilt: 4, zoom: 2.2 }, sky: { tilt: 14, zoom: 0.2 } };
+  let flyView = 'track';
+  function setFlyView(v) {
+    flyView = v;
+    flyOff.tilt = 0; flyOff.zoom = 0;
+    document.getElementById('flyView').textContent = v === 'track' ? '上空から' : '線路から';
+  }
+  document.getElementById('flyView').addEventListener('click', () => setFlyView(flyView === 'track' ? 'sky' : 'track'));
   // 飛ぶ速さの倍率（ゆっくり 0.5・ふつう 1・速い 2・最速 4）。飛んでいる途中でも変えられる
   let flyMul = 1;
   const FLY_MULS = [0.5, 1, 2, 4];
@@ -1488,7 +1522,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     document.getElementById('flyMulVal').textContent = '×' + m;
   }
   // rev: 道すじを逆向きにたどる
-  // ride: 車窓ガイドで走るとき { pts: 進む順の点, look(進んだ距離 m, 進む向き) → 向くべき向き, z(x, y, 線路の高さ), tilt, zoom, sec }
+  // ride: 車窓ガイドで走るとき { pts: 進む順の点, look(進んだ距離 m, 進む向き) → 向くべき向き, z(x, y, 線路の高さ), sec }
   function flyLine(li, rev = false, ride = null) {
     let pts = ride ? ride.pts : linePath(li);
     if (!pts) return;
@@ -1501,7 +1535,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     }
     const total = (P.length - 1) * 50, speed = ride ? total / ride.sec : Math.max(300, total / 90); // m/秒。長い路線は 90 秒ほどで
     flying = true;
-    flyOff.orbit = 0; flyOff.tilt = 0; flyOff.zoom = 0;
+    flyOff.orbit = 0;
+    setFlyView('track');
     // 飛んでいるあいだは deck.gl の操作を止め、ドラッグとホイールを「列車の目線からのずれ」として自分で受け取る
     deckgl.setProps({ controller: false });
     document.getElementById('flyBar').hidden = false;
@@ -1525,7 +1560,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
       const want = ride ? ride.look(sdist, angle(i)) : angle(i);
       if (heading === null) heading = want;
       heading += ((((want - heading) % 360) + 540) % 360 - 180) * (ride ? 0.035 : 0.06);
-      const vs = { ...current, target: [x, y, z], rotationOrbit: heading + flyOff.orbit, rotationX: Math.max(-89, Math.min(90, (ride ? ride.tilt : 14) + flyOff.tilt)), zoom: Math.max(-6, Math.min(4, (ride ? ride.zoom : 0.2) + flyOff.zoom)) };
+      const vs = { ...current, target: [x, y, z], rotationOrbit: heading + flyOff.orbit, rotationX: Math.max(-89, Math.min(90, FLY_VIEWS[flyView].tilt + flyOff.tilt)), zoom: Math.max(-6, Math.min(4, FLY_VIEWS[flyView].zoom + flyOff.zoom)) };
       current = vs;
       setNeedle(vs.rotationOrbit);
       deckgl.setProps({ initialViewState: { ...vs, ...LIMITS, transitionDuration: 0 } });
@@ -1765,7 +1800,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const trainStatus = document.getElementById('trainStatus');
   async function loadTrains() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=murpji75').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=murtcvox').then((r) => r.json()); buildSegGrid(); }
       await loadTimetable();
       const lists = await Promise.all(TRAIN_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:Train?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
@@ -1846,7 +1881,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const infoBox = document.getElementById('infoBox');
   async function loadInfo() {
     try {
-      if (!odpt) { odpt = await fetch('odpt.json?v=murpji75').then((r) => r.json()); buildSegGrid(); }
+      if (!odpt) { odpt = await fetch('odpt.json?v=murtcvox').then((r) => r.json()); buildSegGrid(); }
       const lists = await Promise.all(INFO_OPS.map(([up, op]) =>
         fetch(`${RELAY}/${up}/v4/odpt:TrainInformation?odpt:operator=odpt.Operator:${op}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])));
       const next = new Map(), items = [];
@@ -1913,7 +1948,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     const file = clock.custom ? document.getElementById('clockDay').value : serviceDay().file;
     if (file === ttFile) return;
     ttFile = file;
-    tt = await fetch(`${file}.json?v=murpji75`).then((r) => r.json()).catch(() => null);
+    tt = await fetch(`${file}.json?v=murtcvox`).then((r) => r.json()).catch(() => null);
   }
   const TT_TYPE = { ...TRAIN_TYPE, SemiExpress: '準急', CommuterExpress: '通勤急行', RapidExpress: '快速急行', 'F-Liner': 'Fライナー', 'S-TRAIN': 'S-TRAIN', 'TH-LINER': 'THライナー', CommuterSemiExpress: '通勤準急' };
   function ttTick() {
@@ -2159,7 +2194,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   const man = (n) => (n >= 10000 ? `約 ${(n / 10000).toFixed(n >= 100000 ? 0 : 1)} 万人` : `約 ${n.toLocaleString()} 人`);
   // 逃げ先（dist/safe.json。build-safe.mjs が作る）: 洪水のときの指定緊急避難場所（近い 3 か所）と、駅のまわり 300m の浸水の深さより 3m 以上高い建物
   let safeData = null, safeLoading = null;
-  const loadSafe = () => safeLoading || (safeLoading = fetch('safe.json?v=murpji75').then((r) => r.json()).catch(() => ({ sh: {}, vb: {} })).then((d) => { safeData = d; if (state.found) showCard(state.found); redraw(); }));
+  const loadSafe = () => safeLoading || (safeLoading = fetch('safe.json?v=murtcvox').then((r) => r.json()).catch(() => ({ sh: {}, vb: {} })).then((d) => { safeData = d; if (state.found) showCard(state.found); redraw(); }));
   // 避難場所まで歩く時間（秒）: 道のりは直線の 1.3 倍、歩く速さは雨の中を考えて 1.0m/秒
   const walkSec = (dm) => dm * 1.3 / 1.0;
   const mins = (sec) => Math.max(1, Math.round(sec / 60));
@@ -2233,7 +2268,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   // 点は 100m ごと。fj: 0 見えない・1 山頂だけ・2 山頂から 1,000m 下まで、fa: 山頂の見上げの角度（0.1 度）、fb: 富士山の方角、
   // sea: 1 左・2 右（東京 → 静岡の向きで）＋見えた海の番号 × 4、cat: 0 地上・1 トンネル・2 高架
   let winData = null, winLoading = null, winRiding = false, winLook = 'auto', winNowKey = '';
-  const loadWin = () => winLoading || (winLoading = fetch('window.json?v=murpji75').then((r) => r.json()).then((d) => {
+  const loadWin = () => winLoading || (winLoading = fetch('window.json?v=murtcvox').then((r) => r.json()).then((d) => {
     for (const r of d.routes) {
       const P = [];
       let x = 0, y = 0, z = 0;
@@ -2377,7 +2412,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     // 進んだ距離から路線の点の番号に
     const idx = (d) => { const j = Math.max(0, Math.min(n - 1, Math.round(d / step))); return rev ? n - 1 - j : j; };
     flyLine(null, false, {
-      pts, sec: 150, tilt: 7, zoom: 1.4,
+      pts, sec: 150,
       z: (x, y, z0) => groundZ(x, y) + (z0 + 3) * state.exagH,
       look: (d) => {
         const k = idx(d);
@@ -2493,8 +2528,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
   };
   let far = null;  // 地形で計算した遠くの見え方（富士山・スカイツリー）
   const loadViews = () => viewsLoading || (viewsLoading = Promise.all([
-    fetch('views.json?v=murpji75').then((r) => r.json()),
-    fetch('far.json?v=murpji75').then((r) => r.json()).catch(() => null),
+    fetch('views.json?v=murtcvox').then((r) => r.json()),
+    fetch('far.json?v=murtcvox').then((r) => r.json()).catch(() => null),
   ]).then(([v, f]) => {
     views = v; far = f;
     if (f) for (const z in f.has) f.has[z] = new Set(f.has[z]);
@@ -2532,7 +2567,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outl
     let t = seeTiles.get(id);
     if (!t) {
       t = { data: null, cv: {}, z, x, y, dir };
-      t.ready = fetch(`${id}.png?v=murpji75`).then((r) => r.blob())
+      t.ready = fetch(`${id}.png?v=murtcvox`).then((r) => r.blob())
         .then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
         .then((bm) => {
           const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -2894,7 +2929,7 @@ onmessage = (e) => {
         allBUse.set(k, ++allBTick);
         if (!allB.has(k)) {
           allB.set(k, null);
-          fetch(`view/b/${k}.json?v=murpji75`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
+          fetch(`view/b/${k}.json?v=murtcvox`).then((r) => r.json()).then((arr) => { allBQueue.push([k, t.url.x, t.url.y, arr]); allBNext(); }).catch(() => allB.delete(k));
         }
       }
     }
@@ -3121,7 +3156,7 @@ onmessage = (e) => {
     const [z, x, y] = k.split('/').map(Number);
     t = { k, z, x, y, g: null, mesh: null, meshKey: '', tex: {}, ox: pxX(x * 256, z), oy: pxY(y * 256, z) };
     terrData.set(k, t);
-    fetch(`view/terr/${k}.bin?v=murpji75`).then((r) => r.arrayBuffer()).then((b) => {
+    fetch(`view/terr/${k}.bin?v=murtcvox`).then((r) => r.arrayBuffer()).then((b) => {
       t.g = new Int16Array(b);
       // 「見える範囲」の色のため、同じ場所の遠くのタイルも読む
       if (far.has[z] && far.has[z].has(x + '/' + y)) seeTile(z, x, y, 'view/far').ready.then(() => { t.tex = {}; redraw(); });
